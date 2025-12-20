@@ -12,21 +12,51 @@ export default function HomeScreen() {
   const [showSetupGuide, setShowSetupGuide] = useState(false);
   const [isSupabaseConfigured, setIsSupabaseConfigured] = useState(false);
   const [customerCount, setCustomerCount] = useState(0);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    checkSupabaseConfig();
-    loadCustomerCount();
+    initializeScreen();
   }, []);
 
-  const checkSupabaseConfig = () => {
-    const configured = storageUtils.shouldUseSupabase();
-    setIsSupabaseConfigured(configured);
-    console.log('Supabase configured:', configured);
+  const initializeScreen = async () => {
+    try {
+      setIsLoading(true);
+      setError(null);
+      
+      console.log('Initializing home screen...');
+      await checkSupabaseConfig();
+      await loadCustomerCount();
+      
+      console.log('Home screen initialized successfully');
+    } catch (err) {
+      console.error('Error initializing home screen:', err);
+      setError(err instanceof Error ? err.message : 'Failed to load data');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const checkSupabaseConfig = async () => {
+    try {
+      const configured = storageUtils.shouldUseSupabase();
+      setIsSupabaseConfigured(configured);
+      console.log('Supabase configured:', configured);
+    } catch (err) {
+      console.error('Error checking Supabase config:', err);
+      setIsSupabaseConfigured(false);
+    }
   };
 
   const loadCustomerCount = async () => {
-    const customers = await storageUtils.getCustomers();
-    setCustomerCount(customers.length);
+    try {
+      const customers = await storageUtils.getCustomers();
+      setCustomerCount(customers.length);
+      console.log(`Loaded ${customers.length} customers`);
+    } catch (err) {
+      console.error('Error loading customer count:', err);
+      setCustomerCount(0);
+    }
   };
 
   const handleMigrateData = async () => {
@@ -38,15 +68,17 @@ export default function HomeScreen() {
         {
           text: 'Migrate',
           onPress: async () => {
-            const result = await storageUtils.migrateToSupabase();
-            Alert.alert(
-              result.success ? 'Success' : 'Error',
-              result.message,
-              [{ text: 'OK', onPress: () => {
-                checkSupabaseConfig();
-                loadCustomerCount();
-              }}]
-            );
+            try {
+              const result = await storageUtils.migrateToSupabase();
+              Alert.alert(
+                result.success ? 'Success' : 'Error',
+                result.message,
+                [{ text: 'OK', onPress: () => initializeScreen() }]
+              );
+            } catch (err) {
+              console.error('Migration error:', err);
+              Alert.alert('Error', 'Failed to migrate data');
+            }
           },
         },
       ]
@@ -55,6 +87,30 @@ export default function HomeScreen() {
 
   if (showSetupGuide) {
     return <SupabaseSetupGuide onDismiss={() => setShowSetupGuide(false)} />;
+  }
+
+  if (isLoading) {
+    return (
+      <View style={styles.container}>
+        <View style={styles.loadingContainer}>
+          <Text style={styles.loadingText}>Loading...</Text>
+        </View>
+      </View>
+    );
+  }
+
+  if (error) {
+    return (
+      <View style={styles.container}>
+        <View style={styles.errorContainer}>
+          <Text style={styles.errorTitle}>Error Loading Data</Text>
+          <Text style={styles.errorMessage}>{error}</Text>
+          <TouchableOpacity style={styles.retryButton} onPress={initializeScreen}>
+            <Text style={styles.retryButtonText}>Retry</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
   }
 
   return (
@@ -261,6 +317,45 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    fontSize: 18,
+    color: colors.text,
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  errorTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: colors.text,
+    marginBottom: 12,
+    textAlign: 'center',
+  },
+  errorMessage: {
+    fontSize: 16,
+    color: colors.textSecondary,
+    marginBottom: 24,
+    textAlign: 'center',
+  },
+  retryButton: {
+    backgroundColor: colors.primary,
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 8,
+  },
+  retryButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '600',
   },
   scrollView: {
     flex: 1,
