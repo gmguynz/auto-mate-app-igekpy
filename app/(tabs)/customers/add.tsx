@@ -20,10 +20,13 @@ import { dateUtils } from '@/utils/dateUtils';
 
 export default function AddCustomerScreen() {
   const router = useRouter();
-  const [name, setName] = useState('');
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
+  const [companyName, setCompanyName] = useState('');
   const [address, setAddress] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
+  const [mobile, setMobile] = useState('');
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [showDatePicker, setShowDatePicker] = useState<{
     show: boolean;
@@ -79,16 +82,16 @@ export default function AddCustomerScreen() {
   };
 
   const validateAndSave = async () => {
-    if (!name.trim()) {
-      Alert.alert('Error', 'Please enter customer name');
+    if (!firstName.trim() && !companyName.trim()) {
+      Alert.alert('Error', 'Please enter either a first name or company name');
       return;
     }
     if (!email.trim()) {
       Alert.alert('Error', 'Please enter customer email');
       return;
     }
-    if (!phone.trim()) {
-      Alert.alert('Error', 'Please enter customer phone');
+    if (!phone.trim() && !mobile.trim()) {
+      Alert.alert('Error', 'Please enter at least one phone number');
       return;
     }
     if (vehicles.length === 0) {
@@ -118,10 +121,13 @@ export default function AddCustomerScreen() {
 
     const newCustomer: Customer = {
       id: Date.now().toString(),
-      name: name.trim(),
+      firstName: firstName.trim(),
+      lastName: lastName.trim(),
+      companyName: companyName.trim(),
       address: address.trim(),
       email: email.trim(),
       phone: phone.trim(),
+      mobile: mobile.trim(),
       vehicles,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
@@ -156,13 +162,31 @@ export default function AddCustomerScreen() {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Customer Information</Text>
 
-          <Text style={styles.label}>Name *</Text>
+          <Text style={styles.label}>First Name</Text>
           <TextInput
             style={styles.input}
-            placeholder="John Doe"
+            placeholder="John"
             placeholderTextColor={colors.textSecondary}
-            value={name}
-            onChangeText={setName}
+            value={firstName}
+            onChangeText={setFirstName}
+          />
+
+          <Text style={styles.label}>Last Name</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="Doe"
+            placeholderTextColor={colors.textSecondary}
+            value={lastName}
+            onChangeText={setLastName}
+          />
+
+          <Text style={styles.label}>Company Name (Optional)</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="ABC Motors Ltd"
+            placeholderTextColor={colors.textSecondary}
+            value={companyName}
+            onChangeText={setCompanyName}
           />
 
           <Text style={styles.label}>Address</Text>
@@ -186,13 +210,23 @@ export default function AddCustomerScreen() {
             autoCapitalize="none"
           />
 
-          <Text style={styles.label}>Phone *</Text>
+          <Text style={styles.label}>Phone Number</Text>
           <TextInput
             style={styles.input}
             placeholder="+1 234 567 8900"
             placeholderTextColor={colors.textSecondary}
             value={phone}
             onChangeText={setPhone}
+            keyboardType="phone-pad"
+          />
+
+          <Text style={styles.label}>Mobile Number</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="+1 234 567 8901"
+            placeholderTextColor={colors.textSecondary}
+            value={mobile}
+            onChangeText={setMobile}
             keyboardType="phone-pad"
           />
         </View>

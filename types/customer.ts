@@ -11,10 +11,13 @@ export interface Vehicle {
 
 export interface Customer {
   id: string;
-  name: string;
+  firstName: string;
+  lastName: string;
+  companyName: string;
   address: string;
   email: string;
   phone: string;
+  mobile: string;
   vehicles: Vehicle[];
   createdAt: string;
   updatedAt: string;

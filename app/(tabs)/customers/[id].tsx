@@ -45,16 +45,16 @@ export default function CustomerDetailScreen() {
   const handleSave = async () => {
     if (!editedCustomer) return;
 
-    if (!editedCustomer.name.trim()) {
-      Alert.alert('Error', 'Please enter customer name');
+    if (!editedCustomer.firstName.trim() && !editedCustomer.companyName.trim()) {
+      Alert.alert('Error', 'Please enter either a first name or company name');
       return;
     }
     if (!editedCustomer.email.trim()) {
       Alert.alert('Error', 'Please enter customer email');
       return;
     }
-    if (!editedCustomer.phone.trim()) {
-      Alert.alert('Error', 'Please enter customer phone');
+    if (!editedCustomer.phone.trim() && !editedCustomer.mobile.trim()) {
+      Alert.alert('Error', 'Please enter at least one phone number');
       return;
     }
 
@@ -132,6 +132,13 @@ export default function CustomerDetailScreen() {
     setShowDatePicker({ show: false, vehicleIndex: -1, field: 'inspection' });
   };
 
+  const getCustomerDisplayName = (cust: Customer) => {
+    if (cust.companyName) {
+      return cust.companyName;
+    }
+    return `${cust.firstName} ${cust.lastName}`.trim();
+  };
+
   if (!customer || !editedCustomer) {
     return (
       <View style={styles.container}>
@@ -165,7 +172,7 @@ export default function CustomerDetailScreen() {
             color={colors.text}
           />
         </TouchableOpacity>
-        <Text style={styles.title}>Customer Details</Text>
+        <Text style={styles.title}>{getCustomerDisplayName(customer)}</Text>
         {!isEditing ? (
           <TouchableOpacity onPress={() => setIsEditing(true)} style={styles.editButton}>
             <IconSymbol
@@ -188,15 +195,37 @@ export default function CustomerDetailScreen() {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Customer Information</Text>
 
-          <Text style={styles.label}>Name</Text>
+          <Text style={styles.label}>First Name</Text>
           {isEditing ? (
             <TextInput
               style={styles.input}
-              value={editedCustomer.name}
-              onChangeText={(text) => updateField('name', text)}
+              value={editedCustomer.firstName}
+              onChangeText={(text) => updateField('firstName', text)}
             />
           ) : (
-            <Text style={styles.value}>{customer.name}</Text>
+            <Text style={styles.value}>{customer.firstName || 'Not provided'}</Text>
+          )}
+
+          <Text style={styles.label}>Last Name</Text>
+          {isEditing ? (
+            <TextInput
+              style={styles.input}
+              value={editedCustomer.lastName}
+              onChangeText={(text) => updateField('lastName', text)}
+            />
+          ) : (
+            <Text style={styles.value}>{customer.lastName || 'Not provided'}</Text>
+          )}
+
+          <Text style={styles.label}>Company Name</Text>
+          {isEditing ? (
+            <TextInput
+              style={styles.input}
+              value={editedCustomer.companyName}
+              onChangeText={(text) => updateField('companyName', text)}
+            />
+          ) : (
+            <Text style={styles.value}>{customer.companyName || 'Not provided'}</Text>
           )}
 
           <Text style={styles.label}>Address</Text>
@@ -224,7 +253,7 @@ export default function CustomerDetailScreen() {
             <Text style={styles.value}>{customer.email}</Text>
           )}
 
-          <Text style={styles.label}>Phone</Text>
+          <Text style={styles.label}>Phone Number</Text>
           {isEditing ? (
             <TextInput
               style={styles.input}
@@ -233,7 +262,19 @@ export default function CustomerDetailScreen() {
               keyboardType="phone-pad"
             />
           ) : (
-            <Text style={styles.value}>{customer.phone}</Text>
+            <Text style={styles.value}>{customer.phone || 'Not provided'}</Text>
+          )}
+
+          <Text style={styles.label}>Mobile Number</Text>
+          {isEditing ? (
+            <TextInput
+              style={styles.input}
+              value={editedCustomer.mobile}
+              onChangeText={(text) => updateField('mobile', text)}
+              keyboardType="phone-pad"
+            />
+          ) : (
+            <Text style={styles.value}>{customer.mobile || 'Not provided'}</Text>
           )}
         </View>
 

@@ -22,6 +22,7 @@ interface Reminder {
   customerName: string;
   customerEmail: string;
   customerPhone: string;
+  customerMobile: string;
   vehicleId: string;
   vehicleReg: string;
   vehicleDetails: string;
@@ -50,20 +51,29 @@ export default function RemindersScreen() {
     setReminderSettings(settings);
   };
 
+  const getCustomerDisplayName = (customer: Customer) => {
+    if (customer.companyName) {
+      return customer.companyName;
+    }
+    return `${customer.firstName} ${customer.lastName}`.trim();
+  };
+
   const loadReminders = async () => {
     const customers = await storageUtils.getCustomers();
     const allReminders: Reminder[] = [];
 
     customers.forEach((customer) => {
+      const displayName = getCustomerDisplayName(customer);
       customer.vehicles.forEach((vehicle) => {
         if (vehicle.inspectionDueDate) {
           const daysUntil = dateUtils.getDaysUntil(vehicle.inspectionDueDate);
           if (daysUntil <= 30) {
             allReminders.push({
               customerId: customer.id,
-              customerName: customer.name,
+              customerName: displayName,
               customerEmail: customer.email,
               customerPhone: customer.phone,
+              customerMobile: customer.mobile,
               vehicleId: vehicle.id,
               vehicleReg: vehicle.registrationNumber,
               vehicleDetails: `${vehicle.year} ${vehicle.make} ${vehicle.model}`,
@@ -80,9 +90,10 @@ export default function RemindersScreen() {
           if (daysUntil <= 30) {
             allReminders.push({
               customerId: customer.id,
-              customerName: customer.name,
+              customerName: displayName,
               customerEmail: customer.email,
               customerPhone: customer.phone,
+              customerMobile: customer.mobile,
               vehicleId: vehicle.id,
               vehicleReg: vehicle.registrationNumber,
               vehicleDetails: `${vehicle.year} ${vehicle.make} ${vehicle.model}`,
@@ -127,9 +138,15 @@ export default function RemindersScreen() {
   };
 
   const sendSmsReminder = (reminder: Reminder) => {
+    const phoneNumber = reminder.customerMobile || reminder.customerPhone;
+    if (!phoneNumber) {
+      Alert.alert('Error', 'No phone number available for this customer');
+      return;
+    }
+
     const message = `Hi ${reminder.customerName}, your vehicle ${reminder.vehicleReg} is ${reminder.isOverdue ? 'overdue' : 'due soon'} for ${reminder.type}. Due: ${dateUtils.formatDate(reminder.dueDate)}. Please contact us to schedule.`;
 
-    const url = `sms:${reminder.customerPhone}${Platform.OS === 'ios' ? '&' : '?'}body=${encodeURIComponent(message)}`;
+    const url = `sms:${phoneNumber}${Platform.OS === 'ios' ? '&' : '?'}body=${encodeURIComponent(message)}`;
     
     Linking.canOpenURL(url)
       .then((supported) => {
@@ -146,21 +163,37 @@ export default function RemindersScreen() {
   };
 
   const handleSendReminder = (reminder: Reminder) => {
-    Alert.alert(
-      'Send Reminder',
-      `Send reminder to ${reminder.customerName}?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Email',
-          onPress: () => sendEmailReminder(reminder),
-        },
-        {
-          text: 'SMS',
-          onPress: () => sendSmsReminder(reminder),
-        },
-      ]
-    );
+    const hasPhone = reminder.customerPhone || reminder.customerMobile;
+    
+    if (!hasPhone) {
+      Alert.alert(
+        'Send Reminder',
+        `Send email reminder to ${reminder.customerName}?`,
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Send Email',
+            onPress: () => sendEmailReminder(reminder),
+          },
+        ]
+      );
+    } else {
+      Alert.alert(
+        'Send Reminder',
+        `Send reminder to ${reminder.customerName}?`,
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Email',
+            onPress: () => sendEmailReminder(reminder),
+          },
+          {
+            text: 'SMS',
+            onPress: () => sendSmsReminder(reminder),
+          },
+        ]
+      );
+    }
   };
 
   const overdueReminders = reminders.filter((r) => r.isOverdue);

@@ -42,9 +42,12 @@ export default function CustomersScreen() {
       const query = searchQuery.toLowerCase();
       const filtered = customers.filter(
         (customer) =>
-          customer.name.toLowerCase().includes(query) ||
+          customer.firstName.toLowerCase().includes(query) ||
+          customer.lastName.toLowerCase().includes(query) ||
+          customer.companyName.toLowerCase().includes(query) ||
           customer.email.toLowerCase().includes(query) ||
           customer.phone.toLowerCase().includes(query) ||
+          customer.mobile.toLowerCase().includes(query) ||
           customer.vehicles.some(
             (v) =>
               v.registrationNumber.toLowerCase().includes(query) ||
@@ -99,6 +102,13 @@ export default function CustomersScreen() {
     return reminders;
   };
 
+  const getCustomerDisplayName = (customer: Customer) => {
+    if (customer.companyName) {
+      return customer.companyName;
+    }
+    return `${customer.firstName} ${customer.lastName}`.trim();
+  };
+
   return (
     <View style={styles.container}>
       <View style={styles.header}>
@@ -133,7 +143,7 @@ export default function CustomersScreen() {
         />
         <TextInput
           style={styles.searchInput}
-          placeholder="Search customers, vehicles..."
+          placeholder="Search by name, company, vehicle reg..."
           placeholderTextColor={colors.textSecondary}
           value={searchQuery}
           onChangeText={setSearchQuery}
@@ -175,6 +185,7 @@ export default function CustomersScreen() {
         ) : (
           filteredCustomers.map((customer, index) => {
             const reminders = getUpcomingReminders(customer);
+            const displayName = getCustomerDisplayName(customer);
             return (
               <React.Fragment key={index}>
                 <TouchableOpacity
@@ -184,7 +195,18 @@ export default function CustomersScreen() {
                 >
                   <View style={styles.customerHeader}>
                     <View style={styles.customerInfo}>
-                      <Text style={styles.customerName}>{customer.name}</Text>
+                      <Text style={styles.customerName}>{displayName}</Text>
+                      {customer.companyName && (
+                        <Text style={styles.customerDetail}>
+                          <IconSymbol
+                            ios_icon_name="person.fill"
+                            android_material_icon_name="person"
+                            size={14}
+                            color={colors.textSecondary}
+                          />{' '}
+                          {customer.firstName} {customer.lastName}
+                        </Text>
+                      )}
                       <Text style={styles.customerDetail}>
                         <IconSymbol
                           ios_icon_name="envelope"
@@ -194,18 +216,31 @@ export default function CustomersScreen() {
                         />{' '}
                         {customer.email}
                       </Text>
-                      <Text style={styles.customerDetail}>
-                        <IconSymbol
-                          ios_icon_name="phone"
-                          android_material_icon_name="phone"
-                          size={14}
-                          color={colors.textSecondary}
-                        />{' '}
-                        {customer.phone}
-                      </Text>
+                      {customer.phone && (
+                        <Text style={styles.customerDetail}>
+                          <IconSymbol
+                            ios_icon_name="phone"
+                            android_material_icon_name="phone"
+                            size={14}
+                            color={colors.textSecondary}
+                          />{' '}
+                          Phone: {customer.phone}
+                        </Text>
+                      )}
+                      {customer.mobile && (
+                        <Text style={styles.customerDetail}>
+                          <IconSymbol
+                            ios_icon_name="iphone"
+                            android_material_icon_name="smartphone"
+                            size={14}
+                            color={colors.textSecondary}
+                          />{' '}
+                          Mobile: {customer.mobile}
+                        </Text>
+                      )}
                     </View>
                     <TouchableOpacity
-                      onPress={() => handleDeleteCustomer(customer.id, customer.name)}
+                      onPress={() => handleDeleteCustomer(customer.id, displayName)}
                       style={styles.deleteButton}
                     >
                       <IconSymbol
