@@ -17,6 +17,7 @@ import { IconSymbol } from '@/components/IconSymbol';
 import { Customer, Vehicle } from '@/types/customer';
 import { storageUtils } from '@/utils/storage';
 import { dateUtils } from '@/utils/dateUtils';
+import { notificationService } from '@/utils/notificationService';
 
 export default function CustomerDetailScreen() {
   const router = useRouter();
@@ -64,6 +65,11 @@ export default function CustomerDetailScreen() {
     };
 
     await storageUtils.updateCustomer(updated);
+    
+    // Reschedule all notifications to reflect the updated customer data
+    console.log('Rescheduling notifications after updating customer...');
+    await notificationService.scheduleAllReminders();
+    
     setCustomer(updated);
     setIsEditing(false);
     Alert.alert('Success', 'Customer updated successfully');

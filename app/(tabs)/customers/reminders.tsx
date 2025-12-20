@@ -9,6 +9,7 @@ import {
   Alert,
   Linking,
   Platform,
+  RefreshControl,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { colors } from '@/styles/commonStyles';
@@ -16,6 +17,7 @@ import { IconSymbol } from '@/components/IconSymbol';
 import { Customer } from '@/types/customer';
 import { storageUtils } from '@/utils/storage';
 import { dateUtils } from '@/utils/dateUtils';
+import { notificationService } from '@/utils/notificationService';
 
 interface Reminder {
   customerId: string;
@@ -35,20 +37,29 @@ interface Reminder {
 export default function RemindersScreen() {
   const router = useRouter();
   const [reminders, setReminders] = useState<Reminder[]>([]);
-  const [reminderSettings, setReminderSettings] = useState({
-    enableEmailReminders: true,
-    enableSmsReminders: false,
-    reminderDaysBefore: 7,
+  const [notificationStats, setNotificationStats] = useState({
+    total: 0,
+    inspections: 0,
+    services: 0,
   });
+  const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
     loadReminders();
-    loadSettings();
+    loadNotificationStats();
   }, []);
 
-  const loadSettings = async () => {
-    const settings = await storageUtils.getReminderSettings();
-    setReminderSettings(settings);
+  const loadNotificationStats = async () => {
+    const stats = await notificationService.getNotificationStats();
+    setNotificationStats(stats);
+  };
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await notificationService.scheduleAllReminders();
+    await loadReminders();
+    await loadNotificationStats();
+    setRefreshing(false);
   };
 
   const getCustomerDisplayName = (customer: Customer) => {
@@ -218,7 +229,34 @@ export default function RemindersScreen() {
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+        }
       >
+        <View style={styles.automationCard}>
+          <View style={styles.automationHeader}>
+            <IconSymbol
+              ios_icon_name="bell.badge.fill"
+              android_material_icon_name="notifications-active"
+              size={24}
+              color={colors.success}
+            />
+            <Text style={styles.automationTitle}>Automated Reminders Active</Text>
+          </View>
+          <Text style={styles.automationText}>
+            {notificationStats.total} notifications scheduled automatically
+          </Text>
+          <Text style={styles.automationSubtext}>
+            • {notificationStats.inspections} inspection reminders
+          </Text>
+          <Text style={styles.automationSubtext}>
+            • {notificationStats.services} service reminders
+          </Text>
+          <Text style={styles.automationInfo}>
+            Customers will receive notifications 2 weeks before their due dates.
+          </Text>
+        </View>
+
         <View style={styles.infoCard}>
           <IconSymbol
             ios_icon_name="info.circle"
@@ -227,7 +265,7 @@ export default function RemindersScreen() {
             color={colors.primary}
           />
           <Text style={styles.infoText}>
-            Tap on a reminder to send an email or SMS notification to the customer.
+            Tap on a reminder to manually send an email or SMS notification to the customer.
           </Text>
         </View>
 
@@ -374,6 +412,43 @@ const styles = StyleSheet.create({
   scrollContent: {
     padding: 20,
     paddingBottom: 120,
+  },
+  automationCard: {
+    backgroundColor: '#e8f5e9',
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 16,
+    borderWidth: 2,
+    borderColor: colors.success,
+  },
+  automationHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginBottom: 8,
+  },
+  automationTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: colors.text,
+  },
+  automationText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: colors.text,
+    marginBottom: 8,
+  },
+  automationSubtext: {
+    fontSize: 14,
+    color: colors.textSecondary,
+    marginLeft: 8,
+    marginBottom: 4,
+  },
+  automationInfo: {
+    fontSize: 13,
+    color: colors.textSecondary,
+    marginTop: 8,
+    fontStyle: 'italic',
   },
   infoCard: {
     flexDirection: 'row',
