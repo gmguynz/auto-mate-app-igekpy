@@ -1,140 +1,215 @@
-import React, { useState, useEffect } from "react";
-import { Stack } from "expo-router";
-import { ScrollView, StyleSheet, View, Text, TouchableOpacity } from "react-native";
-import { useRouter } from "expo-router";
-import { colors } from "@/styles/commonStyles";
-import { IconSymbol } from "@/components/IconSymbol";
-import { storageUtils } from "@/utils/storage";
-import { dateUtils } from "@/utils/dateUtils";
-import { HeaderRightButton, HeaderLeftButton } from "@/components/HeaderButtons";
+
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert } from 'react-native';
+import { useRouter } from 'expo-router';
+import { colors } from '@/styles/commonStyles';
+import { IconSymbol } from '@/components/IconSymbol';
+import { storageUtils } from '@/utils/storage';
+import { SupabaseSetupGuide } from '@/components/SupabaseSetupGuide';
 
 export default function HomeScreen() {
   const router = useRouter();
-  const [stats, setStats] = useState({
-    totalCustomers: 0,
-    totalVehicles: 0,
-    overdueInspections: 0,
-    overdueServices: 0,
-    upcomingReminders: 0,
-  });
+  const [showSetupGuide, setShowSetupGuide] = useState(false);
+  const [isSupabaseConfigured, setIsSupabaseConfigured] = useState(false);
+  const [customerCount, setCustomerCount] = useState(0);
 
   useEffect(() => {
-    loadStats();
+    checkSupabaseConfig();
+    loadCustomerCount();
   }, []);
 
-  const loadStats = async () => {
-    const customers = await storageUtils.getCustomers();
-    let totalVehicles = 0;
-    let overdueInspections = 0;
-    let overdueServices = 0;
-    let upcomingReminders = 0;
-
-    customers.forEach((customer) => {
-      totalVehicles += customer.vehicles.length;
-      customer.vehicles.forEach((vehicle) => {
-        if (dateUtils.isOverdue(vehicle.inspectionDueDate)) {
-          overdueInspections++;
-        } else if (dateUtils.isDueSoon(vehicle.inspectionDueDate)) {
-          upcomingReminders++;
-        }
-        if (dateUtils.isOverdue(vehicle.serviceDueDate)) {
-          overdueServices++;
-        } else if (dateUtils.isDueSoon(vehicle.serviceDueDate)) {
-          upcomingReminders++;
-        }
-      });
-    });
-
-    setStats({
-      totalCustomers: customers.length,
-      totalVehicles,
-      overdueInspections,
-      overdueServices,
-      upcomingReminders,
-    });
+  const checkSupabaseConfig = () => {
+    const configured = storageUtils.shouldUseSupabase();
+    setIsSupabaseConfigured(configured);
+    console.log('Supabase configured:', configured);
   };
 
+  const loadCustomerCount = async () => {
+    const customers = await storageUtils.getCustomers();
+    setCustomerCount(customers.length);
+  };
+
+  const handleMigrateData = async () => {
+    Alert.alert(
+      'Migrate to Supabase',
+      'This will move all your local customer data to Supabase cloud storage. Make sure you have set up your Supabase project first.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Migrate',
+          onPress: async () => {
+            const result = await storageUtils.migrateToSupabase();
+            Alert.alert(
+              result.success ? 'Success' : 'Error',
+              result.message,
+              [{ text: 'OK', onPress: () => {
+                checkSupabaseConfig();
+                loadCustomerCount();
+              }}]
+            );
+          },
+        },
+      ]
+    );
+  };
+
+  if (showSetupGuide) {
+    return <SupabaseSetupGuide onDismiss={() => setShowSetupGuide(false)} />;
+  }
+
   return (
-    <>
-      <Stack.Screen
-        options={{
-          title: "Mechanic Dashboard",
-          headerRight: () => <HeaderRightButton />,
-          headerLeft: () => <HeaderLeftButton />,
-        }}
-      />
-      <View style={[styles.container, { backgroundColor: colors.background }]}>
-        <ScrollView
-          contentContainerStyle={styles.scrollContent}
-          showsVerticalScrollIndicator={false}
-        >
-          <View style={styles.statsGrid}>
-            <View style={styles.statCard}>
-              <IconSymbol
-                ios_icon_name="person.2.fill"
-                android_material_icon_name="people"
-                size={32}
-                color={colors.primary}
-              />
-              <Text style={styles.statValue}>{stats.totalCustomers}</Text>
-              <Text style={styles.statLabel}>Customers</Text>
-            </View>
+    <View style={styles.container}>
+      <ScrollView
+        style={styles.scrollView}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
+        <View style={styles.header}>
+          <Text style={styles.title}>Mechanic Database</Text>
+          <Text style={styles.subtitle}>Customer & Vehicle Management</Text>
+        </View>
 
-            <View style={styles.statCard}>
-              <IconSymbol
-                ios_icon_name="car.fill"
-                android_material_icon_name="directions-car"
-                size={32}
-                color={colors.secondary}
-              />
-              <Text style={styles.statValue}>{stats.totalVehicles}</Text>
-              <Text style={styles.statLabel}>Vehicles</Text>
-            </View>
-
-            <View style={[styles.statCard, stats.overdueInspections > 0 && styles.alertCard]}>
-              <IconSymbol
-                ios_icon_name="exclamationmark.triangle.fill"
-                android_material_icon_name="warning"
-                size={32}
-                color={stats.overdueInspections > 0 ? colors.error : colors.textSecondary}
-              />
-              <Text style={[styles.statValue, stats.overdueInspections > 0 && styles.alertText]}>
-                {stats.overdueInspections}
+        {!isSupabaseConfigured && (
+          <TouchableOpacity
+            style={styles.warningCard}
+            onPress={() => setShowSetupGuide(true)}
+          >
+            <IconSymbol
+              ios_icon_name="exclamationmark.triangle.fill"
+              android_material_icon_name="warning"
+              size={32}
+              color={colors.accent}
+            />
+            <View style={styles.warningContent}>
+              <Text style={styles.warningTitle}>Using Local Storage</Text>
+              <Text style={styles.warningText}>
+                Your data is stored locally on this device only. Tap here to set up cloud storage with Supabase for multi-device access.
               </Text>
-              <Text style={styles.statLabel}>Overdue Inspections</Text>
             </View>
+            <IconSymbol
+              ios_icon_name="chevron.right"
+              android_material_icon_name="chevron-right"
+              size={20}
+              color={colors.textSecondary}
+            />
+          </TouchableOpacity>
+        )}
 
-            <View style={[styles.statCard, stats.overdueServices > 0 && styles.alertCard]}>
-              <IconSymbol
-                ios_icon_name="exclamationmark.triangle.fill"
-                android_material_icon_name="warning"
-                size={32}
-                color={stats.overdueServices > 0 ? colors.error : colors.textSecondary}
-              />
-              <Text style={[styles.statValue, stats.overdueServices > 0 && styles.alertText]}>
-                {stats.overdueServices}
+        {isSupabaseConfigured && (
+          <View style={styles.successCard}>
+            <IconSymbol
+              ios_icon_name="checkmark.circle.fill"
+              android_material_icon_name="check-circle"
+              size={32}
+              color="#4CAF50"
+            />
+            <View style={styles.successContent}>
+              <Text style={styles.successTitle}>Cloud Storage Active</Text>
+              <Text style={styles.successText}>
+                Your data is securely stored in Supabase and accessible from any device.
               </Text>
-              <Text style={styles.statLabel}>Overdue Services</Text>
             </View>
           </View>
+        )}
 
-          {stats.upcomingReminders > 0 && (
-            <TouchableOpacity
-              style={styles.reminderBanner}
-              onPress={() => router.push('/customers/reminders')}
-            >
+        <View style={styles.statsContainer}>
+          <View style={styles.statCard}>
+            <IconSymbol
+              ios_icon_name="person.3.fill"
+              android_material_icon_name="people"
+              size={32}
+              color={colors.primary}
+            />
+            <Text style={styles.statNumber}>{customerCount}</Text>
+            <Text style={styles.statLabel}>Customers</Text>
+          </View>
+
+          <TouchableOpacity
+            style={styles.statCard}
+            onPress={() => router.push('/customers/reminders')}
+          >
+            <IconSymbol
+              ios_icon_name="bell.fill"
+              android_material_icon_name="notifications"
+              size={32}
+              color={colors.accent}
+            />
+            <Text style={styles.statLabel}>View Reminders</Text>
+          </TouchableOpacity>
+        </View>
+
+        <View style={styles.actionsContainer}>
+          <Text style={styles.actionsTitle}>Quick Actions</Text>
+
+          <TouchableOpacity
+            style={styles.actionCard}
+            onPress={() => router.push('/customers')}
+          >
+            <View style={styles.actionIcon}>
               <IconSymbol
-                ios_icon_name="bell.fill"
-                android_material_icon_name="notifications"
+                ios_icon_name="person.crop.circle"
+                android_material_icon_name="person"
                 size={24}
-                color={colors.accent}
+                color={colors.primary}
               />
-              <View style={styles.reminderContent}>
-                <Text style={styles.reminderTitle}>
-                  {stats.upcomingReminders} Upcoming Reminder{stats.upcomingReminders !== 1 ? 's' : ''}
-                </Text>
-                <Text style={styles.reminderSubtitle}>
-                  Tap to view and send notifications
+            </View>
+            <View style={styles.actionContent}>
+              <Text style={styles.actionTitle}>View Customers</Text>
+              <Text style={styles.actionDescription}>
+                Browse and manage your customer database
+              </Text>
+            </View>
+            <IconSymbol
+              ios_icon_name="chevron.right"
+              android_material_icon_name="chevron-right"
+              size={20}
+              color={colors.textSecondary}
+            />
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.actionCard}
+            onPress={() => router.push('/customers/add')}
+          >
+            <View style={styles.actionIcon}>
+              <IconSymbol
+                ios_icon_name="plus.circle.fill"
+                android_material_icon_name="add-circle"
+                size={24}
+                color={colors.primary}
+              />
+            </View>
+            <View style={styles.actionContent}>
+              <Text style={styles.actionTitle}>Add New Customer</Text>
+              <Text style={styles.actionDescription}>
+                Create a new customer record with vehicle details
+              </Text>
+            </View>
+            <IconSymbol
+              ios_icon_name="chevron.right"
+              android_material_icon_name="chevron-right"
+              size={20}
+              color={colors.textSecondary}
+            />
+          </TouchableOpacity>
+
+          {!isSupabaseConfigured && customerCount > 0 && (
+            <TouchableOpacity
+              style={[styles.actionCard, styles.migrateCard]}
+              onPress={handleMigrateData}
+            >
+              <View style={styles.actionIcon}>
+                <IconSymbol
+                  ios_icon_name="arrow.up.doc.fill"
+                  android_material_icon_name="cloud-upload"
+                  size={24}
+                  color={colors.accent}
+                />
+              </View>
+              <View style={styles.actionContent}>
+                <Text style={styles.actionTitle}>Migrate to Cloud</Text>
+                <Text style={styles.actionDescription}>
+                  Move your {customerCount} customer{customerCount !== 1 ? 's' : ''} to Supabase cloud storage
                 </Text>
               </View>
               <IconSymbol
@@ -145,184 +220,154 @@ export default function HomeScreen() {
               />
             </TouchableOpacity>
           )}
+        </View>
 
-          <View style={styles.quickActions}>
-            <Text style={styles.sectionTitle}>Quick Actions</Text>
-
-            <TouchableOpacity
-              style={styles.actionButton}
-              onPress={() => router.push('/customers/add')}
-            >
-              <View style={styles.actionIcon}>
-                <IconSymbol
-                  ios_icon_name="person.crop.circle.badge.plus"
-                  android_material_icon_name="person-add"
-                  size={28}
-                  color={colors.primary}
-                />
-              </View>
-              <View style={styles.actionContent}>
-                <Text style={styles.actionTitle}>Add New Customer</Text>
-                <Text style={styles.actionSubtitle}>
-                  Register a new customer and their vehicles
-                </Text>
-              </View>
-              <IconSymbol
-                ios_icon_name="chevron.right"
-                android_material_icon_name="chevron-right"
-                size={20}
-                color={colors.textSecondary}
-              />
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.actionButton}
-              onPress={() => router.push('/customers')}
-            >
-              <View style={styles.actionIcon}>
-                <IconSymbol
-                  ios_icon_name="list.bullet"
-                  android_material_icon_name="list"
-                  size={28}
-                  color={colors.secondary}
-                />
-              </View>
-              <View style={styles.actionContent}>
-                <Text style={styles.actionTitle}>View All Customers</Text>
-                <Text style={styles.actionSubtitle}>
-                  Browse and search customer database
-                </Text>
-              </View>
-              <IconSymbol
-                ios_icon_name="chevron.right"
-                android_material_icon_name="chevron-right"
-                size={20}
-                color={colors.textSecondary}
-              />
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.actionButton}
-              onPress={() => router.push('/customers/reminders')}
-            >
-              <View style={styles.actionIcon}>
-                <IconSymbol
-                  ios_icon_name="bell.badge.fill"
-                  android_material_icon_name="notifications-active"
-                  size={28}
-                  color={colors.accent}
-                />
-              </View>
-              <View style={styles.actionContent}>
-                <Text style={styles.actionTitle}>Send Reminders</Text>
-                <Text style={styles.actionSubtitle}>
-                  View and send service reminders
-                </Text>
-              </View>
-              <IconSymbol
-                ios_icon_name="chevron.right"
-                android_material_icon_name="chevron-right"
-                size={20}
-                color={colors.textSecondary}
-              />
-            </TouchableOpacity>
+        <View style={styles.infoSection}>
+          <Text style={styles.infoTitle}>About This App</Text>
+          <Text style={styles.infoText}>
+            This customer database app helps mechanics manage customer information, vehicle details, and service reminders. 
+            {'\n\n'}
+            Features include:
+          </Text>
+          <View style={styles.featureList}>
+            <View style={styles.featureItem}>
+              <Text style={styles.featureBullet}>•</Text>
+              <Text style={styles.featureText}>Store customer and vehicle information</Text>
+            </View>
+            <View style={styles.featureItem}>
+              <Text style={styles.featureBullet}>•</Text>
+              <Text style={styles.featureText}>Track inspection and service due dates</Text>
+            </View>
+            <View style={styles.featureItem}>
+              <Text style={styles.featureBullet}>•</Text>
+              <Text style={styles.featureText}>Automated reminders 14 days before due dates</Text>
+            </View>
+            <View style={styles.featureItem}>
+              <Text style={styles.featureBullet}>•</Text>
+              <Text style={styles.featureText}>Search by name, company, or vehicle registration</Text>
+            </View>
+            <View style={styles.featureItem}>
+              <Text style={styles.featureBullet}>•</Text>
+              <Text style={styles.featureText}>Cloud storage with Supabase (optional)</Text>
+            </View>
           </View>
-
-          <View style={styles.infoSection}>
-            <IconSymbol
-              ios_icon_name="info.circle"
-              android_material_icon_name="info"
-              size={20}
-              color={colors.primary}
-            />
-            <Text style={styles.infoText}>
-              This app stores all data locally on your device. Reminders can be sent via email or SMS by tapping on them.
-            </Text>
-          </View>
-        </ScrollView>
-      </View>
-    </>
+        </View>
+      </ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: colors.background,
+  },
+  scrollView: {
+    flex: 1,
   },
   scrollContent: {
-    paddingVertical: 16,
-    paddingHorizontal: 20,
-    paddingBottom: 40,
+    padding: 20,
+    paddingTop: 60,
+    paddingBottom: 100,
   },
-  statsGrid: {
+  header: {
+    marginBottom: 24,
+  },
+  title: {
+    fontSize: 32,
+    fontWeight: 'bold',
+    color: colors.text,
+    marginBottom: 4,
+  },
+  subtitle: {
+    fontSize: 16,
+    color: colors.textSecondary,
+  },
+  warningCard: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
+    alignItems: 'center',
+    backgroundColor: '#FFF3E0',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 24,
+    borderWidth: 1,
+    borderColor: '#FFB74D',
+    gap: 12,
+  },
+  warningContent: {
+    flex: 1,
+  },
+  warningTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: colors.text,
+    marginBottom: 4,
+  },
+  warningText: {
+    fontSize: 14,
+    color: colors.textSecondary,
+    lineHeight: 20,
+  },
+  successCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#E8F5E9',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 24,
+    borderWidth: 1,
+    borderColor: '#81C784',
+    gap: 12,
+  },
+  successContent: {
+    flex: 1,
+  },
+  successTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: colors.text,
+    marginBottom: 4,
+  },
+  successText: {
+    fontSize: 14,
+    color: colors.textSecondary,
+    lineHeight: 20,
+  },
+  statsContainer: {
+    flexDirection: 'row',
     gap: 12,
     marginBottom: 24,
   },
   statCard: {
     flex: 1,
-    minWidth: '45%',
     backgroundColor: colors.card,
     borderRadius: 12,
-    padding: 16,
+    padding: 20,
     alignItems: 'center',
     borderWidth: 1,
     borderColor: colors.border,
-    boxShadow: '0px 2px 4px rgba(0, 0, 0, 0.05)',
-    elevation: 2,
   },
-  alertCard: {
-    borderColor: colors.error,
-    backgroundColor: '#ffebee',
-  },
-  statValue: {
-    fontSize: 28,
+  statNumber: {
+    fontSize: 32,
     fontWeight: 'bold',
     color: colors.text,
     marginTop: 8,
   },
-  alertText: {
-    color: colors.error,
-  },
   statLabel: {
-    fontSize: 13,
+    fontSize: 14,
     color: colors.textSecondary,
     marginTop: 4,
-    textAlign: 'center',
   },
-  reminderBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.highlight,
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 24,
-    gap: 12,
-  },
-  reminderContent: {
-    flex: 1,
-  },
-  reminderTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: colors.text,
-    marginBottom: 2,
-  },
-  reminderSubtitle: {
-    fontSize: 13,
-    color: colors.textSecondary,
-  },
-  quickActions: {
+  actionsContainer: {
     marginBottom: 24,
   },
-  sectionTitle: {
+  actionsTitle: {
     fontSize: 20,
     fontWeight: 'bold',
     color: colors.text,
     marginBottom: 12,
   },
-  actionButton: {
+  actionCard: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: colors.card,
@@ -333,11 +378,15 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     gap: 12,
   },
+  migrateCard: {
+    backgroundColor: '#FFF3E0',
+    borderColor: '#FFB74D',
+  },
   actionIcon: {
     width: 48,
     height: 48,
     borderRadius: 24,
-    backgroundColor: colors.background,
+    backgroundColor: colors.highlight,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -350,22 +399,48 @@ const styles = StyleSheet.create({
     color: colors.text,
     marginBottom: 2,
   },
-  actionSubtitle: {
-    fontSize: 13,
+  actionDescription: {
+    fontSize: 14,
     color: colors.textSecondary,
+    lineHeight: 18,
   },
   infoSection: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    backgroundColor: '#e3f2fd',
-    borderRadius: 8,
-    padding: 12,
-    gap: 10,
+    backgroundColor: colors.card,
+    borderRadius: 12,
+    padding: 20,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  infoTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: colors.text,
+    marginBottom: 12,
   },
   infoText: {
+    fontSize: 14,
+    color: colors.textSecondary,
+    lineHeight: 20,
+    marginBottom: 12,
+  },
+  featureList: {
+    gap: 8,
+  },
+  featureItem: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+  },
+  featureBullet: {
+    fontSize: 16,
+    color: colors.primary,
+    fontWeight: 'bold',
+    marginTop: 2,
+  },
+  featureText: {
     flex: 1,
-    fontSize: 13,
-    color: colors.text,
-    lineHeight: 18,
+    fontSize: 14,
+    color: colors.textSecondary,
+    lineHeight: 20,
   },
 });
