@@ -10,6 +10,7 @@ import {
   Linking,
   Platform,
   RefreshControl,
+  ActivityIndicator,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { colors } from '@/styles/commonStyles';
@@ -18,6 +19,8 @@ import { Customer } from '@/types/customer';
 import { storageUtils } from '@/utils/storage';
 import { dateUtils } from '@/utils/dateUtils';
 import { notificationService } from '@/utils/notificationService';
+import { emailService } from '@/utils/emailService';
+import { isSupabaseConfigured } from '@/integrations/supabase/client';
 
 interface Reminder {
   customerId: string;
@@ -28,10 +31,11 @@ interface Reminder {
   vehicleId: string;
   vehicleReg: string;
   vehicleDetails: string;
-  type: 'inspection' | 'service';
+  types: ('inspection' | 'service')[];
   dueDate: string;
   daysUntil: number;
   isOverdue: boolean;
+  isMerged: boolean;
 }
 
 export default function RemindersScreen() {
@@ -41,8 +45,10 @@ export default function RemindersScreen() {
     total: 0,
     inspections: 0,
     services: 0,
+    merged: 0,
   });
   const [refreshing, setRefreshing] = useState(false);
+  const [sendingEmail, setSendingEmail] = useState<string | null>(null);
 
   useEffect(() => {
     loadReminders();
@@ -76,9 +82,14 @@ export default function RemindersScreen() {
     customers.forEach((customer) => {
       const displayName = getCustomerDisplayName(customer);
       customer.vehicles.forEach((vehicle) => {
-        if (vehicle.inspectionDueDate) {
-          const daysUntil = dateUtils.getDaysUntil(vehicle.inspectionDueDate);
+        const inspectionDate = vehicle.inspectionDueDate;
+        const serviceDate = vehicle.serviceDueDate;
+
+        // Check if both are due on the same day
+        if (inspectionDate && serviceDate && inspectionDate === serviceDate) {
+          const daysUntil = dateUtils.getDaysUntil(inspectionDate);
           if (daysUntil <= 30) {
+            // Merged reminder
             allReminders.push({
               customerId: customer.id,
               customerName: displayName,
@@ -88,31 +99,55 @@ export default function RemindersScreen() {
               vehicleId: vehicle.id,
               vehicleReg: vehicle.registrationNumber,
               vehicleDetails: `${vehicle.year} ${vehicle.make} ${vehicle.model}`,
-              type: 'inspection',
-              dueDate: vehicle.inspectionDueDate,
+              types: ['inspection', 'service'],
+              dueDate: inspectionDate,
               daysUntil,
-              isOverdue: dateUtils.isOverdue(vehicle.inspectionDueDate),
+              isOverdue: dateUtils.isOverdue(inspectionDate),
+              isMerged: true,
             });
           }
-        }
+        } else {
+          // Separate reminders
+          if (inspectionDate) {
+            const daysUntil = dateUtils.getDaysUntil(inspectionDate);
+            if (daysUntil <= 30) {
+              allReminders.push({
+                customerId: customer.id,
+                customerName: displayName,
+                customerEmail: customer.email,
+                customerPhone: customer.phone,
+                customerMobile: customer.mobile,
+                vehicleId: vehicle.id,
+                vehicleReg: vehicle.registrationNumber,
+                vehicleDetails: `${vehicle.year} ${vehicle.make} ${vehicle.model}`,
+                types: ['inspection'],
+                dueDate: inspectionDate,
+                daysUntil,
+                isOverdue: dateUtils.isOverdue(inspectionDate),
+                isMerged: false,
+              });
+            }
+          }
 
-        if (vehicle.serviceDueDate) {
-          const daysUntil = dateUtils.getDaysUntil(vehicle.serviceDueDate);
-          if (daysUntil <= 30) {
-            allReminders.push({
-              customerId: customer.id,
-              customerName: displayName,
-              customerEmail: customer.email,
-              customerPhone: customer.phone,
-              customerMobile: customer.mobile,
-              vehicleId: vehicle.id,
-              vehicleReg: vehicle.registrationNumber,
-              vehicleDetails: `${vehicle.year} ${vehicle.make} ${vehicle.model}`,
-              type: 'service',
-              dueDate: vehicle.serviceDueDate,
-              daysUntil,
-              isOverdue: dateUtils.isOverdue(vehicle.serviceDueDate),
-            });
+          if (serviceDate) {
+            const daysUntil = dateUtils.getDaysUntil(serviceDate);
+            if (daysUntil <= 30) {
+              allReminders.push({
+                customerId: customer.id,
+                customerName: displayName,
+                customerEmail: customer.email,
+                customerPhone: customer.phone,
+                customerMobile: customer.mobile,
+                vehicleId: vehicle.id,
+                vehicleReg: vehicle.registrationNumber,
+                vehicleDetails: `${vehicle.year} ${vehicle.make} ${vehicle.model}`,
+                types: ['service'],
+                dueDate: serviceDate,
+                daysUntil,
+                isOverdue: dateUtils.isOverdue(serviceDate),
+                isMerged: false,
+              });
+            }
           }
         }
       });
@@ -128,9 +163,60 @@ export default function RemindersScreen() {
     setReminders(allReminders);
   };
 
-  const sendEmailReminder = (reminder: Reminder) => {
-    const subject = `${reminder.type === 'inspection' ? 'Inspection' : 'Service'} Reminder - ${reminder.vehicleReg}`;
-    const body = `Dear ${reminder.customerName},\n\nThis is a reminder that your vehicle ${reminder.vehicleReg} (${reminder.vehicleDetails}) is ${reminder.isOverdue ? 'overdue' : 'due soon'} for ${reminder.type}.\n\nDue Date: ${dateUtils.formatDate(reminder.dueDate)}\n\nPlease contact us to schedule an appointment.\n\nBest regards,\nYour Mechanic Shop`;
+  const sendAutomatedEmail = async (reminder: Reminder) => {
+    if (!reminder.customerEmail) {
+      Alert.alert('Error', 'No email address available for this customer');
+      return;
+    }
+
+    if (!isSupabaseConfigured()) {
+      emailService.showSetupInstructions();
+      return;
+    }
+
+    setSendingEmail(reminder.vehicleId);
+
+    try {
+      const typeText = reminder.isMerged 
+        ? 'inspection and service' 
+        : reminder.types[0];
+      
+      const subject = reminder.isMerged
+        ? `Inspection & Service Reminder - ${reminder.vehicleReg}`
+        : `${reminder.types[0] === 'inspection' ? 'Inspection' : 'Service'} Reminder - ${reminder.vehicleReg}`;
+      
+      const body = `Dear ${reminder.customerName},\n\nThis is a reminder that your vehicle ${reminder.vehicleReg} (${reminder.vehicleDetails}) is ${reminder.isOverdue ? 'overdue' : 'due soon'} for ${typeText}.\n\nDue Date: ${dateUtils.formatDate(reminder.dueDate)}\n\nPlease contact us to schedule an appointment.\n\nBest regards,\nYour Mechanic Shop`;
+
+      const result = await emailService.sendEmail({
+        to: reminder.customerEmail,
+        subject,
+        body,
+        customerName: reminder.customerName,
+      });
+
+      if (result.success) {
+        Alert.alert('Success', `Email sent successfully to ${reminder.customerName}`);
+      } else {
+        Alert.alert('Error', result.error || 'Failed to send email');
+      }
+    } catch (error) {
+      console.error('Error sending email:', error);
+      Alert.alert('Error', 'An unexpected error occurred while sending the email');
+    } finally {
+      setSendingEmail(null);
+    }
+  };
+
+  const sendEmailViaClient = (reminder: Reminder) => {
+    const typeText = reminder.isMerged 
+      ? 'inspection and service' 
+      : reminder.types[0];
+    
+    const subject = reminder.isMerged
+      ? `Inspection & Service Reminder - ${reminder.vehicleReg}`
+      : `${reminder.types[0] === 'inspection' ? 'Inspection' : 'Service'} Reminder - ${reminder.vehicleReg}`;
+    
+    const body = `Dear ${reminder.customerName},\n\nThis is a reminder that your vehicle ${reminder.vehicleReg} (${reminder.vehicleDetails}) is ${reminder.isOverdue ? 'overdue' : 'due soon'} for ${typeText}.\n\nDue Date: ${dateUtils.formatDate(reminder.dueDate)}\n\nPlease contact us to schedule an appointment.\n\nBest regards,\nYour Mechanic Shop`;
 
     const url = `mailto:${reminder.customerEmail}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
     
@@ -155,7 +241,11 @@ export default function RemindersScreen() {
       return;
     }
 
-    const message = `Hi ${reminder.customerName}, your vehicle ${reminder.vehicleReg} is ${reminder.isOverdue ? 'overdue' : 'due soon'} for ${reminder.type}. Due: ${dateUtils.formatDate(reminder.dueDate)}. Please contact us to schedule.`;
+    const typeText = reminder.isMerged 
+      ? 'inspection & service' 
+      : reminder.types[0];
+
+    const message = `Hi ${reminder.customerName}, your vehicle ${reminder.vehicleReg} is ${reminder.isOverdue ? 'overdue' : 'due soon'} for ${typeText}. Due: ${dateUtils.formatDate(reminder.dueDate)}. Please contact us to schedule.`;
 
     const url = `sms:${phoneNumber}${Platform.OS === 'ios' ? '&' : '?'}body=${encodeURIComponent(message)}`;
     
@@ -175,36 +265,54 @@ export default function RemindersScreen() {
 
   const handleSendReminder = (reminder: Reminder) => {
     const hasPhone = reminder.customerPhone || reminder.customerMobile;
-    
-    if (!hasPhone) {
-      Alert.alert(
-        'Send Reminder',
-        `Send email reminder to ${reminder.customerName}?`,
-        [
-          { text: 'Cancel', style: 'cancel' },
-          {
-            text: 'Send Email',
-            onPress: () => sendEmailReminder(reminder),
-          },
-        ]
-      );
-    } else {
-      Alert.alert(
-        'Send Reminder',
-        `Send reminder to ${reminder.customerName}?`,
-        [
-          { text: 'Cancel', style: 'cancel' },
-          {
-            text: 'Email',
-            onPress: () => sendEmailReminder(reminder),
-          },
-          {
-            text: 'SMS',
-            onPress: () => sendSmsReminder(reminder),
-          },
-        ]
-      );
+    const hasEmail = reminder.customerEmail;
+    const supabaseConfigured = isSupabaseConfigured();
+
+    if (!hasEmail && !hasPhone) {
+      Alert.alert('Error', 'No contact information available for this customer');
+      return;
     }
+
+    const buttons: any[] = [{ text: 'Cancel', style: 'cancel' }];
+
+    if (hasEmail && supabaseConfigured) {
+      buttons.push({
+        text: 'Send Email (Auto)',
+        onPress: () => sendAutomatedEmail(reminder),
+      });
+    }
+
+    if (hasEmail) {
+      buttons.push({
+        text: supabaseConfigured ? 'Email (Client)' : 'Email',
+        onPress: () => sendEmailViaClient(reminder),
+      });
+    }
+
+    if (hasPhone) {
+      buttons.push({
+        text: 'SMS',
+        onPress: () => sendSmsReminder(reminder),
+      });
+    }
+
+    Alert.alert(
+      'Send Reminder',
+      `Send reminder to ${reminder.customerName}?`,
+      buttons
+    );
+  };
+
+  const getReminderTypeText = (reminder: Reminder) => {
+    if (reminder.isMerged) {
+      return reminder.isOverdue 
+        ? 'Inspection & Service OVERDUE' 
+        : `Inspection & Service due in ${reminder.daysUntil} days`;
+    }
+    const type = reminder.types[0] === 'inspection' ? 'Inspection' : 'Service';
+    return reminder.isOverdue 
+      ? `${type} OVERDUE` 
+      : `${type} due in ${reminder.daysUntil} days`;
   };
 
   const overdueReminders = reminders.filter((r) => r.isOverdue);
@@ -252,6 +360,11 @@ export default function RemindersScreen() {
           <Text style={styles.automationSubtext}>
             • {notificationStats.services} service reminders
           </Text>
+          {notificationStats.merged > 0 && (
+            <Text style={styles.automationSubtext}>
+              • {notificationStats.merged} merged reminders (inspection & service on same day)
+            </Text>
+          )}
           <Text style={styles.automationInfo}>
             Customers will receive notifications 2 weeks before their due dates.
           </Text>
@@ -265,7 +378,9 @@ export default function RemindersScreen() {
             color={colors.primary}
           />
           <Text style={styles.infoText}>
-            Tap on a reminder to manually send an email or SMS notification to the customer.
+            {isSupabaseConfigured() 
+              ? 'Tap a reminder to send automated email or SMS to the customer.'
+              : 'Tap a reminder to send email (via client) or SMS. Set up Supabase for automated emails.'}
           </Text>
         </View>
 
@@ -280,6 +395,7 @@ export default function RemindersScreen() {
                   style={[styles.reminderCard, styles.overdueCard]}
                   onPress={() => handleSendReminder(reminder)}
                   activeOpacity={0.7}
+                  disabled={sendingEmail === reminder.vehicleId}
                 >
                   <View style={styles.reminderHeader}>
                     <IconSymbol
@@ -296,19 +412,22 @@ export default function RemindersScreen() {
                         {reminder.vehicleReg} - {reminder.vehicleDetails}
                       </Text>
                       <Text style={styles.reminderType}>
-                        {reminder.type === 'inspection' ? 'Inspection' : 'Service'}{' '}
-                        OVERDUE
+                        {getReminderTypeText(reminder)}
                       </Text>
                       <Text style={styles.reminderDate}>
                         Due: {dateUtils.formatDate(reminder.dueDate)}
                       </Text>
                     </View>
-                    <IconSymbol
-                      ios_icon_name="chevron.right"
-                      android_material_icon_name="chevron-right"
-                      size={20}
-                      color={colors.textSecondary}
-                    />
+                    {sendingEmail === reminder.vehicleId ? (
+                      <ActivityIndicator size="small" color={colors.primary} />
+                    ) : (
+                      <IconSymbol
+                        ios_icon_name="chevron.right"
+                        android_material_icon_name="chevron-right"
+                        size={20}
+                        color={colors.textSecondary}
+                      />
+                    )}
                   </View>
                 </TouchableOpacity>
               </React.Fragment>
@@ -327,13 +446,14 @@ export default function RemindersScreen() {
                   style={styles.reminderCard}
                   onPress={() => handleSendReminder(reminder)}
                   activeOpacity={0.7}
+                  disabled={sendingEmail === reminder.vehicleId}
                 >
                   <View style={styles.reminderHeader}>
                     <IconSymbol
-                      ios_icon_name="bell.fill"
+                      ios_icon_name={reminder.isMerged ? "bell.badge.fill" : "bell.fill"}
                       android_material_icon_name="notifications"
                       size={24}
-                      color={colors.accent}
+                      color={reminder.isMerged ? colors.success : colors.accent}
                     />
                     <View style={styles.reminderInfo}>
                       <Text style={styles.reminderCustomer}>
@@ -343,19 +463,22 @@ export default function RemindersScreen() {
                         {reminder.vehicleReg} - {reminder.vehicleDetails}
                       </Text>
                       <Text style={styles.reminderType}>
-                        {reminder.type === 'inspection' ? 'Inspection' : 'Service'}{' '}
-                        due in {reminder.daysUntil} days
+                        {getReminderTypeText(reminder)}
                       </Text>
                       <Text style={styles.reminderDate}>
                         Due: {dateUtils.formatDate(reminder.dueDate)}
                       </Text>
                     </View>
-                    <IconSymbol
-                      ios_icon_name="chevron.right"
-                      android_material_icon_name="chevron-right"
-                      size={20}
-                      color={colors.textSecondary}
-                    />
+                    {sendingEmail === reminder.vehicleId ? (
+                      <ActivityIndicator size="small" color={colors.primary} />
+                    ) : (
+                      <IconSymbol
+                        ios_icon_name="chevron.right"
+                        android_material_icon_name="chevron-right"
+                        size={20}
+                        color={colors.textSecondary}
+                      />
+                    )}
                   </View>
                 </TouchableOpacity>
               </React.Fragment>

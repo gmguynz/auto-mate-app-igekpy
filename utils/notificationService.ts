@@ -18,6 +18,13 @@ Notifications.setNotificationHandler({
 const NOTIFICATION_CHANNEL_ID = 'service-reminders';
 const REMINDER_DAYS_BEFORE = 14; // 2 weeks before due date
 
+interface MergedReminder {
+  customer: Customer;
+  vehicle: any;
+  types: ('inspection' | 'service')[];
+  dueDate: string;
+}
+
 export const notificationService = {
   /**
    * Initialize notification service and request permissions
@@ -82,25 +89,11 @@ export const notificationService = {
       // Schedule reminders for each customer's vehicles
       for (const customer of customers) {
         for (const vehicle of customer.vehicles) {
-          // Schedule inspection reminder
-          if (vehicle.inspectionDueDate) {
-            const scheduled = await this.scheduleReminderForDate(
-              customer,
-              vehicle,
-              'inspection',
-              vehicle.inspectionDueDate
-            );
-            if (scheduled) scheduledCount++;
-          }
-
-          // Schedule service reminder
-          if (vehicle.serviceDueDate) {
-            const scheduled = await this.scheduleReminderForDate(
-              customer,
-              vehicle,
-              'service',
-              vehicle.serviceDueDate
-            );
+          // Merge reminders if both inspection and service are due on the same day
+          const mergedReminders = this.getMergedReminders(customer, vehicle);
+          
+          for (const merged of mergedReminders) {
+            const scheduled = await this.scheduleReminderForMerged(merged);
             if (scheduled) scheduledCount++;
           }
         }
@@ -113,16 +106,52 @@ export const notificationService = {
   },
 
   /**
-   * Schedule a reminder for a specific date
+   * Get merged reminders for a vehicle (merge if due on same day)
    */
-  async scheduleReminderForDate(
-    customer: Customer,
-    vehicle: any,
-    type: 'inspection' | 'service',
-    dueDate: string
-  ): Promise<boolean> {
+  getMergedReminders(customer: Customer, vehicle: any): MergedReminder[] {
+    const reminders: MergedReminder[] = [];
+    
+    const inspectionDate = vehicle.inspectionDueDate;
+    const serviceDate = vehicle.serviceDueDate;
+
+    // Check if both dates exist and are the same
+    if (inspectionDate && serviceDate && inspectionDate === serviceDate) {
+      // Merge into one reminder
+      reminders.push({
+        customer,
+        vehicle,
+        types: ['inspection', 'service'],
+        dueDate: inspectionDate,
+      });
+    } else {
+      // Create separate reminders
+      if (inspectionDate) {
+        reminders.push({
+          customer,
+          vehicle,
+          types: ['inspection'],
+          dueDate: inspectionDate,
+        });
+      }
+      if (serviceDate) {
+        reminders.push({
+          customer,
+          vehicle,
+          types: ['service'],
+          dueDate: serviceDate,
+        });
+      }
+    }
+
+    return reminders;
+  },
+
+  /**
+   * Schedule a merged reminder
+   */
+  async scheduleReminderForMerged(merged: MergedReminder): Promise<boolean> {
     try {
-      const dueDateObj = new Date(dueDate);
+      const dueDateObj = new Date(merged.dueDate);
       const today = new Date();
       today.setHours(0, 0, 0, 0);
 
@@ -133,15 +162,25 @@ export const notificationService = {
 
       // Only schedule if reminder date is in the future
       if (reminderDate <= today) {
-        console.log(`Skipping past reminder for ${vehicle.registrationNumber} - ${type}`);
+        console.log(`Skipping past reminder for ${merged.vehicle.registrationNumber}`);
         return false;
       }
 
-      const customerName = customer.companyName || `${customer.firstName} ${customer.lastName}`;
-      const vehicleInfo = `${vehicle.registrationNumber} (${vehicle.year} ${vehicle.make} ${vehicle.model})`;
+      const customerName = merged.customer.companyName || `${merged.customer.firstName} ${merged.customer.lastName}`;
+      const vehicleInfo = `${merged.vehicle.registrationNumber} (${merged.vehicle.year} ${merged.vehicle.make} ${merged.vehicle.model})`;
       
-      const title = `${type === 'inspection' ? 'Inspection' : 'Service'} Reminder`;
-      const body = `${customerName}'s vehicle ${vehicleInfo} is due for ${type} in 2 weeks on ${dateUtils.formatDate(dueDate)}`;
+      // Create title and body based on merged types
+      let title: string;
+      let body: string;
+      
+      if (merged.types.length > 1) {
+        title = 'Inspection & Service Reminder';
+        body = `${customerName}'s vehicle ${vehicleInfo} is due for both inspection and service in 2 weeks on ${dateUtils.formatDate(merged.dueDate)}`;
+      } else {
+        const type = merged.types[0];
+        title = `${type === 'inspection' ? 'Inspection' : 'Service'} Reminder`;
+        body = `${customerName}'s vehicle ${vehicleInfo} is due for ${type} in 2 weeks on ${dateUtils.formatDate(merged.dueDate)}`;
+      }
 
       // Schedule the notification
       const identifier = await Notifications.scheduleNotificationAsync({
@@ -151,10 +190,10 @@ export const notificationService = {
           sound: 'default',
           priority: Notifications.AndroidNotificationPriority.HIGH,
           data: {
-            customerId: customer.id,
-            vehicleId: vehicle.id,
-            type,
-            dueDate,
+            customerId: merged.customer.id,
+            vehicleId: merged.vehicle.id,
+            types: merged.types,
+            dueDate: merged.dueDate,
           },
         },
         trigger: {
@@ -164,12 +203,30 @@ export const notificationService = {
         },
       });
 
-      console.log(`Scheduled ${type} reminder for ${vehicleInfo} on ${reminderDate.toLocaleDateString()}`);
+      console.log(`Scheduled ${merged.types.join(' & ')} reminder for ${vehicleInfo} on ${reminderDate.toLocaleDateString()}`);
       return true;
     } catch (error) {
       console.error('Error scheduling reminder:', error);
       return false;
     }
+  },
+
+  /**
+   * Schedule a reminder for a specific date (legacy method for backward compatibility)
+   */
+  async scheduleReminderForDate(
+    customer: Customer,
+    vehicle: any,
+    type: 'inspection' | 'service',
+    dueDate: string
+  ): Promise<boolean> {
+    const merged: MergedReminder = {
+      customer,
+      vehicle,
+      types: [type],
+      dueDate,
+    };
+    return this.scheduleReminderForMerged(merged);
   },
 
   /**
@@ -203,28 +260,42 @@ export const notificationService = {
     total: number;
     inspections: number;
     services: number;
+    merged: number;
   }> {
     try {
       const notifications = await this.getScheduledNotifications();
       
       let inspections = 0;
       let services = 0;
+      let merged = 0;
 
       notifications.forEach((notification) => {
-        // Safely access nested properties with optional chaining
-        const type = notification?.request?.content?.data?.type;
-        if (type === 'inspection') inspections++;
-        if (type === 'service') services++;
+        const types = notification?.request?.content?.data?.types;
+        if (Array.isArray(types)) {
+          if (types.length > 1) {
+            merged++;
+          } else if (types[0] === 'inspection') {
+            inspections++;
+          } else if (types[0] === 'service') {
+            services++;
+          }
+        } else {
+          // Legacy format
+          const type = notification?.request?.content?.data?.type;
+          if (type === 'inspection') inspections++;
+          if (type === 'service') services++;
+        }
       });
 
       return {
         total: notifications.length,
         inspections,
         services,
+        merged,
       };
     } catch (error) {
       console.error('Error getting notification stats:', error);
-      return { total: 0, inspections: 0, services: 0 };
+      return { total: 0, inspections: 0, services: 0, merged: 0 };
     }
   },
 };
