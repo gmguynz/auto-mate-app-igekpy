@@ -211,7 +211,8 @@ export const notificationService = {
       let services = 0;
 
       notifications.forEach((notification) => {
-        const type = notification.request.content.data?.type;
+        // Safely access nested properties with optional chaining
+        const type = notification?.request?.content?.data?.type;
         if (type === 'inspection') inspections++;
         if (type === 'service') services++;
       });

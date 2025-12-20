@@ -9,6 +9,7 @@ import {
   TextInput,
   Alert,
   Platform,
+  Modal,
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import DateTimePicker from '@react-native-community/datetimepicker';
@@ -143,6 +144,56 @@ export default function CustomerDetailScreen() {
       return cust.companyName;
     }
     return `${cust.firstName} ${cust.lastName}`.trim();
+  };
+
+  const renderDatePicker = () => {
+    if (!showDatePicker.show || showDatePicker.vehicleIndex < 0 || !editedCustomer) {
+      return null;
+    }
+
+    const vehicle = editedCustomer.vehicles[showDatePicker.vehicleIndex];
+    const dateField = showDatePicker.field === 'inspection' ? 'inspectionDueDate' : 'serviceDueDate';
+    const currentDate = vehicle[dateField] ? new Date(vehicle[dateField]) : new Date();
+
+    if (Platform.OS === 'ios') {
+      return (
+        <Modal
+          transparent={true}
+          animationType="slide"
+          visible={showDatePicker.show}
+          onRequestClose={closeDatePicker}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalContent}>
+              <View style={styles.modalHeader}>
+                <TouchableOpacity onPress={closeDatePicker}>
+                  <Text style={styles.modalDoneButton}>Done</Text>
+                </TouchableOpacity>
+              </View>
+              <DateTimePicker
+                value={currentDate}
+                mode="date"
+                display="spinner"
+                onChange={handleDateChange}
+                textColor={colors.text}
+                style={styles.iosDatePicker}
+                minimumDate={new Date()}
+              />
+            </View>
+          </View>
+        </Modal>
+      );
+    }
+
+    return (
+      <DateTimePicker
+        value={currentDate}
+        mode="date"
+        display="default"
+        onChange={handleDateChange}
+        minimumDate={new Date()}
+      />
+    );
   };
 
   if (!customer || !editedCustomer) {
@@ -377,17 +428,17 @@ export default function CustomerDetailScreen() {
                         })
                       }
                     >
-                      <Text style={styles.dateButtonText}>
-                        {vehicle.inspectionDueDate
-                          ? dateUtils.formatDate(vehicle.inspectionDueDate)
-                          : 'Select Date'}
-                      </Text>
                       <IconSymbol
                         ios_icon_name="calendar"
                         android_material_icon_name="calendar-today"
                         size={20}
                         color={colors.primary}
                       />
+                      <Text style={styles.dateButtonText}>
+                        {vehicle.inspectionDueDate
+                          ? dateUtils.formatDate(vehicle.inspectionDueDate)
+                          : 'Select Date'}
+                      </Text>
                     </TouchableOpacity>
                   ) : (
                     <View style={styles.dateDisplay}>
@@ -430,17 +481,17 @@ export default function CustomerDetailScreen() {
                         })
                       }
                     >
-                      <Text style={styles.dateButtonText}>
-                        {vehicle.serviceDueDate
-                          ? dateUtils.formatDate(vehicle.serviceDueDate)
-                          : 'Select Date'}
-                      </Text>
                       <IconSymbol
                         ios_icon_name="calendar"
                         android_material_icon_name="calendar-today"
                         size={20}
                         color={colors.primary}
                       />
+                      <Text style={styles.dateButtonText}>
+                        {vehicle.serviceDueDate
+                          ? dateUtils.formatDate(vehicle.serviceDueDate)
+                          : 'Select Date'}
+                      </Text>
                     </TouchableOpacity>
                   ) : (
                     <View style={styles.dateDisplay}>
@@ -487,35 +538,7 @@ export default function CustomerDetailScreen() {
         )}
       </ScrollView>
 
-      {showDatePicker.show && (
-        <View style={styles.datePickerContainer}>
-          {Platform.OS === 'ios' && (
-            <View style={styles.datePickerHeader}>
-              <TouchableOpacity onPress={closeDatePicker}>
-                <Text style={styles.datePickerDone}>Done</Text>
-              </TouchableOpacity>
-            </View>
-          )}
-          <DateTimePicker
-            value={
-              showDatePicker.vehicleIndex >= 0 &&
-              editedCustomer.vehicles[showDatePicker.vehicleIndex]
-                ? new Date(
-                    editedCustomer.vehicles[showDatePicker.vehicleIndex][
-                      showDatePicker.field === 'inspection'
-                        ? 'inspectionDueDate'
-                        : 'serviceDueDate'
-                    ] || Date.now()
-                  )
-                : new Date()
-            }
-            mode="date"
-            display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-            onChange={handleDateChange}
-            minimumDate={new Date()}
-          />
-        </View>
-      )}
+      {renderDatePicker()}
     </View>
   );
 }
@@ -624,7 +647,6 @@ const styles = StyleSheet.create({
   },
   dateButton: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
     backgroundColor: colors.card,
     borderWidth: 1,
@@ -632,6 +654,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     paddingHorizontal: 12,
     paddingVertical: 12,
+    gap: 10,
   },
   dateButtonText: {
     fontSize: 16,
@@ -697,25 +720,31 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: colors.text,
   },
-  datePickerContainer: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    backgroundColor: colors.card,
-    borderTopWidth: 1,
-    borderTopColor: colors.border,
+  modalOverlay: {
+    flex: 1,
+    justifyContent: 'flex-end',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
   },
-  datePickerHeader: {
+  modalContent: {
+    backgroundColor: colors.card,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    paddingBottom: 34,
+  },
+  modalHeader: {
     flexDirection: 'row',
     justifyContent: 'flex-end',
     padding: 16,
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
   },
-  datePickerDone: {
-    fontSize: 16,
+  modalDoneButton: {
+    fontSize: 17,
     fontWeight: '600',
     color: colors.primary,
+  },
+  iosDatePicker: {
+    height: 216,
+    backgroundColor: colors.card,
   },
 });
