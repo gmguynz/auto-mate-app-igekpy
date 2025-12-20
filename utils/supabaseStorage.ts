@@ -71,6 +71,8 @@ export const supabaseStorage = {
         console.error('Error adding customer to Supabase:', error);
         throw error;
       }
+      
+      console.log('Customer added successfully to Supabase');
     } catch (error) {
       console.error('Error adding customer:', error);
       throw error;
@@ -102,6 +104,8 @@ export const supabaseStorage = {
         console.error('Error updating customer in Supabase:', error);
         throw error;
       }
+      
+      console.log('Customer updated successfully in Supabase');
     } catch (error) {
       console.error('Error updating customer:', error);
       throw error;
@@ -123,6 +127,8 @@ export const supabaseStorage = {
         console.error('Error deleting customer from Supabase:', error);
         throw error;
       }
+      
+      console.log('Customer deleted successfully from Supabase');
     } catch (error) {
       console.error('Error deleting customer:', error);
       throw error;

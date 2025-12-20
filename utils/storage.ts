@@ -11,7 +11,12 @@ const REMINDER_SETTINGS_KEY = '@reminder_settings';
 export const storageUtils = {
   // Check if we should use Supabase
   shouldUseSupabase(): boolean {
-    return supabaseStorage.isConfigured();
+    try {
+      return supabaseStorage.isConfigured();
+    } catch (error) {
+      console.error('Error checking Supabase configuration:', error);
+      return false;
+    }
   },
 
   // Customer operations
@@ -146,7 +151,7 @@ export const storageUtils = {
       if (!this.shouldUseSupabase()) {
         return {
           success: false,
-          message: 'Supabase is not configured. Please set EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_ANON_KEY.',
+          message: 'Supabase is not configured. Please set EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_ANON_KEY in your .env file.',
         };
       }
 
@@ -186,12 +191,12 @@ export const storageUtils = {
         await AsyncStorage.removeItem(CUSTOMERS_KEY);
         return {
           success: true,
-          message: `Successfully migrated ${successCount} customers to Supabase.`,
+          message: `Successfully migrated ${successCount} customer${successCount !== 1 ? 's' : ''} to Supabase.`,
         };
       } else {
         return {
           success: false,
-          message: `Migrated ${successCount} customers, but ${errorCount} failed.`,
+          message: `Migrated ${successCount} customer${successCount !== 1 ? 's' : ''}, but ${errorCount} failed.`,
         };
       }
     } catch (error) {

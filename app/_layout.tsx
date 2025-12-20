@@ -9,9 +9,15 @@ import { notificationService } from '@/utils/notificationService';
 SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
-  const [loaded] = useFonts({
+  const [loaded, error] = useFonts({
     SpaceMono: require('../assets/fonts/SpaceMono-Regular.ttf'),
   });
+
+  useEffect(() => {
+    if (error) {
+      console.error('Error loading fonts:', error);
+    }
+  }, [error]);
 
   useEffect(() => {
     if (loaded) {
@@ -22,24 +28,28 @@ export default function RootLayout() {
   // Initialize notifications when app starts
   useEffect(() => {
     const initializeNotifications = async () => {
-      console.log('Initializing notifications on app start...');
-      const initialized = await notificationService.initialize();
-      
-      if (initialized) {
-        console.log('Scheduling reminders...');
-        await notificationService.scheduleAllReminders();
+      try {
+        console.log('Initializing notifications on app start...');
+        const initialized = await notificationService.initialize();
         
-        const stats = await notificationService.getNotificationStats();
-        console.log(`Notification stats: ${stats.total} total (${stats.inspections} inspections, ${stats.services} services)`);
-      } else {
-        console.log('Notification initialization failed - permissions not granted');
+        if (initialized) {
+          console.log('Scheduling reminders...');
+          await notificationService.scheduleAllReminders();
+          
+          const stats = await notificationService.getNotificationStats();
+          console.log(`Notification stats: ${stats.total} total (${stats.inspections} inspections, ${stats.services} services)`);
+        } else {
+          console.log('Notification initialization failed - permissions not granted');
+        }
+      } catch (error) {
+        console.error('Error initializing notifications:', error);
       }
     };
 
     initializeNotifications();
   }, []);
 
-  if (!loaded) {
+  if (!loaded && !error) {
     return null;
   }
 
