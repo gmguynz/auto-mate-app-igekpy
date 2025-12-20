@@ -9,6 +9,7 @@ import {
   TouchableOpacity,
   Alert,
   Platform,
+  Modal,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import DateTimePicker from '@react-native-community/datetimepicker';
@@ -59,11 +60,22 @@ export default function AddCustomerScreen() {
   };
 
   const handleDateChange = (event: any, selectedDate?: Date) => {
-    setShowDatePicker(false);
+    if (Platform.OS === 'android') {
+      setShowDatePicker(false);
+    }
+    
     if (selectedDate && datePickerMode) {
       const dateString = selectedDate.toISOString().split('T')[0];
       updateVehicle(datePickerMode.vehicleIndex, datePickerMode.field, dateString);
     }
+    
+    if (Platform.OS === 'android') {
+      setDatePickerMode(null);
+    }
+  };
+
+  const handleIOSDatePickerDone = () => {
+    setShowDatePicker(false);
     setDatePickerMode(null);
   };
 
@@ -140,6 +152,54 @@ export default function AddCustomerScreen() {
       console.error('Error saving customer:', error);
       Alert.alert('Error', 'Failed to save customer');
     }
+  };
+
+  const renderDatePicker = () => {
+    if (!showDatePicker || !datePickerMode) {
+      return null;
+    }
+
+    const currentDate = vehicles[datePickerMode.vehicleIndex][datePickerMode.field]
+      ? new Date(vehicles[datePickerMode.vehicleIndex][datePickerMode.field])
+      : new Date();
+
+    if (Platform.OS === 'ios') {
+      return (
+        <Modal
+          transparent={true}
+          animationType="slide"
+          visible={showDatePicker}
+          onRequestClose={handleIOSDatePickerDone}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalContent}>
+              <View style={styles.modalHeader}>
+                <TouchableOpacity onPress={handleIOSDatePickerDone}>
+                  <Text style={styles.modalDoneButton}>Done</Text>
+                </TouchableOpacity>
+              </View>
+              <DateTimePicker
+                value={currentDate}
+                mode="date"
+                display="spinner"
+                onChange={handleDateChange}
+                textColor={colors.text}
+                style={styles.iosDatePicker}
+              />
+            </View>
+          </View>
+        </Modal>
+      );
+    }
+
+    return (
+      <DateTimePicker
+        value={currentDate}
+        mode="date"
+        display="default"
+        onChange={handleDateChange}
+      />
+    );
   };
 
   return (
@@ -252,91 +312,93 @@ export default function AddCustomerScreen() {
           </View>
 
           {vehicles.map((vehicle, index) => (
-            <View key={vehicle.id} style={styles.vehicleCard}>
-              <View style={styles.vehicleHeader}>
-                <Text style={styles.vehicleTitle}>Vehicle {index + 1}</Text>
-                <TouchableOpacity onPress={() => removeVehicle(index)}>
+            <React.Fragment key={vehicle.id}>
+              <View style={styles.vehicleCard}>
+                <View style={styles.vehicleHeader}>
+                  <Text style={styles.vehicleTitle}>Vehicle {index + 1}</Text>
+                  <TouchableOpacity onPress={() => removeVehicle(index)}>
+                    <IconSymbol
+                      ios_icon_name="trash"
+                      android_material_icon_name="delete"
+                      size={20}
+                      color={colors.error}
+                    />
+                  </TouchableOpacity>
+                </View>
+
+                <Text style={styles.label}>Registration Number *</Text>
+                <TextInput
+                  style={styles.input}
+                  value={vehicle.registrationNumber}
+                  onChangeText={(text) =>
+                    updateVehicle(index, 'registrationNumber', text)
+                  }
+                  placeholder="e.g., ABC123"
+                  placeholderTextColor={colors.textSecondary}
+                  autoCapitalize="characters"
+                />
+
+                <Text style={styles.label}>Make *</Text>
+                <TextInput
+                  style={styles.input}
+                  value={vehicle.make}
+                  onChangeText={(text) => updateVehicle(index, 'make', text)}
+                  placeholder="e.g., Toyota"
+                  placeholderTextColor={colors.textSecondary}
+                />
+
+                <Text style={styles.label}>Model *</Text>
+                <TextInput
+                  style={styles.input}
+                  value={vehicle.model}
+                  onChangeText={(text) => updateVehicle(index, 'model', text)}
+                  placeholder="e.g., Camry"
+                  placeholderTextColor={colors.textSecondary}
+                />
+
+                <Text style={styles.label}>Year *</Text>
+                <TextInput
+                  style={styles.input}
+                  value={vehicle.year}
+                  onChangeText={(text) => updateVehicle(index, 'year', text)}
+                  placeholder="e.g., 2020"
+                  placeholderTextColor={colors.textSecondary}
+                  keyboardType="numeric"
+                />
+
+                <Text style={styles.label}>Inspection Due Date</Text>
+                <TouchableOpacity
+                  style={styles.dateButton}
+                  onPress={() => showDatePickerFor(index, 'inspectionDueDate')}
+                >
                   <IconSymbol
-                    ios_icon_name="trash"
-                    android_material_icon_name="delete"
+                    ios_icon_name="calendar"
+                    android_material_icon_name="calendar-today"
                     size={20}
-                    color={colors.error}
+                    color={colors.primary}
                   />
+                  <Text style={styles.dateButtonText}>
+                    {vehicle.inspectionDueDate || 'Select Date'}
+                  </Text>
+                </TouchableOpacity>
+
+                <Text style={styles.label}>Service Due Date</Text>
+                <TouchableOpacity
+                  style={styles.dateButton}
+                  onPress={() => showDatePickerFor(index, 'serviceDueDate')}
+                >
+                  <IconSymbol
+                    ios_icon_name="calendar"
+                    android_material_icon_name="calendar-today"
+                    size={20}
+                    color={colors.primary}
+                  />
+                  <Text style={styles.dateButtonText}>
+                    {vehicle.serviceDueDate || 'Select Date'}
+                  </Text>
                 </TouchableOpacity>
               </View>
-
-              <Text style={styles.label}>Registration Number *</Text>
-              <TextInput
-                style={styles.input}
-                value={vehicle.registrationNumber}
-                onChangeText={(text) =>
-                  updateVehicle(index, 'registrationNumber', text)
-                }
-                placeholder="e.g., ABC123"
-                placeholderTextColor={colors.textSecondary}
-                autoCapitalize="characters"
-              />
-
-              <Text style={styles.label}>Make *</Text>
-              <TextInput
-                style={styles.input}
-                value={vehicle.make}
-                onChangeText={(text) => updateVehicle(index, 'make', text)}
-                placeholder="e.g., Toyota"
-                placeholderTextColor={colors.textSecondary}
-              />
-
-              <Text style={styles.label}>Model *</Text>
-              <TextInput
-                style={styles.input}
-                value={vehicle.model}
-                onChangeText={(text) => updateVehicle(index, 'model', text)}
-                placeholder="e.g., Camry"
-                placeholderTextColor={colors.textSecondary}
-              />
-
-              <Text style={styles.label}>Year *</Text>
-              <TextInput
-                style={styles.input}
-                value={vehicle.year}
-                onChangeText={(text) => updateVehicle(index, 'year', text)}
-                placeholder="e.g., 2020"
-                placeholderTextColor={colors.textSecondary}
-                keyboardType="numeric"
-              />
-
-              <Text style={styles.label}>Inspection Due Date</Text>
-              <TouchableOpacity
-                style={styles.dateButton}
-                onPress={() => showDatePickerFor(index, 'inspectionDueDate')}
-              >
-                <IconSymbol
-                  ios_icon_name="calendar"
-                  android_material_icon_name="calendar-today"
-                  size={20}
-                  color={colors.primary}
-                />
-                <Text style={styles.dateButtonText}>
-                  {vehicle.inspectionDueDate || 'Select Date'}
-                </Text>
-              </TouchableOpacity>
-
-              <Text style={styles.label}>Service Due Date</Text>
-              <TouchableOpacity
-                style={styles.dateButton}
-                onPress={() => showDatePickerFor(index, 'serviceDueDate')}
-              >
-                <IconSymbol
-                  ios_icon_name="calendar"
-                  android_material_icon_name="calendar-today"
-                  size={20}
-                  color={colors.primary}
-                />
-                <Text style={styles.dateButtonText}>
-                  {vehicle.serviceDueDate || 'Select Date'}
-                </Text>
-              </TouchableOpacity>
-            </View>
+            </React.Fragment>
           ))}
 
           {vehicles.length === 0 && (
@@ -356,18 +418,7 @@ export default function AddCustomerScreen() {
         </View>
       </ScrollView>
 
-      {showDatePicker && datePickerMode && (
-        <DateTimePicker
-          value={
-            vehicles[datePickerMode.vehicleIndex][datePickerMode.field]
-              ? new Date(vehicles[datePickerMode.vehicleIndex][datePickerMode.field])
-              : new Date()
-          }
-          mode="date"
-          display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-          onChange={handleDateChange}
-        />
-      )}
+      {renderDatePicker()}
     </View>
   );
 }
@@ -507,5 +558,32 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: colors.textSecondary,
     marginTop: 4,
+  },
+  modalOverlay: {
+    flex: 1,
+    justifyContent: 'flex-end',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+  },
+  modalContent: {
+    backgroundColor: colors.card,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    paddingBottom: 34,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  modalDoneButton: {
+    fontSize: 17,
+    fontWeight: '600',
+    color: colors.primary,
+  },
+  iosDatePicker: {
+    height: 216,
+    backgroundColor: colors.card,
   },
 });
