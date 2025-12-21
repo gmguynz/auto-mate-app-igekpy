@@ -16,22 +16,22 @@ export default function TabLayout() {
       }}
     >
       <NativeTabs.Trigger name="(home)">
-        <Label>Home</Label>
         <Icon sf="house.fill" />
+        <Label>Home</Label>
       </NativeTabs.Trigger>
       <NativeTabs.Trigger name="customers">
-        <Label>Customers</Label>
         <Icon sf="person.2.fill" />
+        <Label>Customers</Label>
       </NativeTabs.Trigger>
       {isAdmin && (
         <NativeTabs.Trigger name="admin">
-          <Label>Admin</Label>
           <Icon sf="shield.fill" />
+          <Label>Admin</Label>
         </NativeTabs.Trigger>
       )}
       <NativeTabs.Trigger name="profile">
-        <Label>Profile</Label>
         <Icon sf="person.circle.fill" />
+        <Label>Profile</Label>
       </NativeTabs.Trigger>
     </NativeTabs>
   );
