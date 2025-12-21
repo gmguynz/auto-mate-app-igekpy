@@ -16,6 +16,7 @@ export const emailService = {
   async sendEmail(emailData: EmailData): Promise<{ success: boolean; error?: string }> {
     try {
       console.log('Attempting to send email to:', emailData.to);
+      console.log('Email subject:', emailData.subject);
 
       // Check if Supabase is configured
       if (!isSupabaseConfigured()) {
@@ -26,26 +27,48 @@ export const emailService = {
         };
       }
 
-      // Call the Supabase Edge Function
+      // Convert plain text body to HTML with line breaks
+      const htmlBody = emailData.body.replace(/\n/g, '<br>');
+
+      // Call the Supabase Edge Function with correct parameters
       const { data, error } = await supabase.functions.invoke('send-reminder-email', {
         body: {
           to: emailData.to,
           subject: emailData.subject,
-          body: emailData.body,
+          html: htmlBody, // Changed from 'body' to 'html'
           customerName: emailData.customerName,
         },
       });
 
       if (error) {
-        console.error('Error sending email:', error);
+        console.error('Error invoking Edge Function:', error);
         return {
           success: false,
           error: error.message || 'Failed to send email',
         };
       }
 
-      console.log('Email sent successfully:', data);
-      return { success: true };
+      // Check if Resend returned an error
+      if (data && data.error) {
+        console.error('Resend API error:', data.error);
+        return {
+          success: false,
+          error: data.error.message || 'Email service error',
+        };
+      }
+
+      // Check if we got an ID back from Resend (indicates success)
+      if (data && data.id) {
+        console.log('Email sent successfully. Resend ID:', data.id);
+        return { success: true };
+      }
+
+      // If we got here, something unexpected happened
+      console.warn('Unexpected response from email service:', data);
+      return {
+        success: false,
+        error: 'Unexpected response from email service. Please check your email configuration.',
+      };
     } catch (error) {
       console.error('Exception sending email:', error);
       return {
@@ -64,7 +87,8 @@ export const emailService = {
       'To enable automated email sending, you need to:\n\n' +
       '1. Set up a Supabase Edge Function named "send-reminder-email"\n' +
       '2. Configure an email service (Resend, SendGrid, etc.)\n' +
-      '3. Add your email API key to Supabase secrets\n\n' +
+      '3. Add your email API key to Supabase secrets\n' +
+      '4. Update the "from" email address in the Edge Function\n\n' +
       'See SUPABASE_SETUP.md for detailed instructions.',
       [{ text: 'OK' }]
     );

@@ -187,6 +187,7 @@ export default function RemindersScreen() {
       
       const body = `Dear ${reminder.customerName},\n\nThis is a reminder that your vehicle ${reminder.vehicleReg} (${reminder.vehicleDetails}) is ${reminder.isOverdue ? 'overdue' : 'due soon'} for ${typeText}.\n\nDue Date: ${dateUtils.formatDate(reminder.dueDate)}\n\nPlease contact us to schedule an appointment.\n\nBest regards,\nYour Mechanic Shop`;
 
+      console.log('Sending automated email...');
       const result = await emailService.sendEmail({
         to: reminder.customerEmail,
         subject,
@@ -197,14 +198,59 @@ export default function RemindersScreen() {
       if (result.success) {
         Alert.alert('Success', `Email sent successfully to ${reminder.customerName}`);
       } else {
-        Alert.alert('Error', result.error || 'Failed to send email');
+        // Show detailed error with troubleshooting option
+        Alert.alert(
+          'Email Failed',
+          result.error || 'Failed to send email',
+          [
+            { text: 'Cancel', style: 'cancel' },
+            {
+              text: 'Troubleshooting',
+              onPress: () => showEmailTroubleshooting(),
+            },
+          ]
+        );
       }
     } catch (error) {
       console.error('Error sending email:', error);
-      Alert.alert('Error', 'An unexpected error occurred while sending the email');
+      Alert.alert(
+        'Error',
+        'An unexpected error occurred while sending the email',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Troubleshooting',
+            onPress: () => showEmailTroubleshooting(),
+          },
+        ]
+      );
     } finally {
       setSendingEmail(null);
     }
+  };
+
+  const showEmailTroubleshooting = () => {
+    Alert.alert(
+      'Email Troubleshooting',
+      'If emails are not arriving, check:\n\n' +
+      '1. RESEND_API_KEY is set in Supabase secrets\n' +
+      '2. FROM_EMAIL is set to your verified domain\n' +
+      '3. Domain is verified in Resend dashboard\n' +
+      '4. DNS records (TXT, MX, DKIM) are configured\n' +
+      '5. Check Edge Function logs in Supabase\n' +
+      '6. Check spam folder\n\n' +
+      'See SUPABASE_SETUP.md for detailed instructions.',
+      [
+        { text: 'OK' },
+        {
+          text: 'View Logs',
+          onPress: () => {
+            const url = 'https://supabase.com/dashboard/project/sykerdryyaorziqjglwb/functions/send-reminder-email/logs';
+            Linking.openURL(url);
+          },
+        },
+      ]
+    );
   };
 
   const sendEmailViaClient = (reminder: Reminder) => {
