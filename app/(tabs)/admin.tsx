@@ -289,59 +289,61 @@ export default function AdminScreen() {
 
         <View style={styles.usersList}>
           <Text style={styles.sectionTitle}>All Users</Text>
-          {users.map((user) => (
-            <View key={user.id} style={styles.userCard}>
-              <View style={styles.userInfo}>
-                <View style={styles.userAvatar}>
-                  <IconSymbol
-                    ios_icon_name="person.fill"
-                    android_material_icon_name="person"
-                    size={24}
-                    color={colors.primary}
-                  />
-                </View>
-                <View style={styles.userDetails}>
-                  <Text style={styles.userName}>{user.full_name || 'No name'}</Text>
-                  <Text style={styles.userEmail}>{user.email}</Text>
-                  <View style={styles.roleBadge}>
-                    <Text
-                      style={[
-                        styles.roleText,
-                        user.role === 'admin' && styles.roleTextAdmin,
-                      ]}
-                    >
-                      {user.role.toUpperCase()}
-                    </Text>
-                  </View>
-                </View>
-              </View>
-              {user.id !== profile?.id && (
-                <View style={styles.userActions}>
-                  <TouchableOpacity
-                    style={styles.actionButton}
-                    onPress={() => handleToggleRole(user.id, user.role, user.email)}
-                  >
+          {users.map((user, index) => (
+            <React.Fragment key={user.id || `user-${index}`}>
+              <View style={styles.userCard}>
+                <View style={styles.userInfo}>
+                  <View style={styles.userAvatar}>
                     <IconSymbol
-                      ios_icon_name="arrow.2.squarepath"
-                      android_material_icon_name="swap-horiz"
-                      size={20}
+                      ios_icon_name="person.fill"
+                      android_material_icon_name="person"
+                      size={24}
                       color={colors.primary}
                     />
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={[styles.actionButton, styles.deleteButton]}
-                    onPress={() => handleDeleteUser(user.id, user.email)}
-                  >
-                    <IconSymbol
-                      ios_icon_name="trash.fill"
-                      android_material_icon_name="delete"
-                      size={20}
-                      color="#FF3B30"
-                    />
-                  </TouchableOpacity>
+                  </View>
+                  <View style={styles.userDetails}>
+                    <Text style={styles.userName}>{user.full_name || 'No name'}</Text>
+                    <Text style={styles.userEmail}>{user.email}</Text>
+                    <View style={styles.roleBadge}>
+                      <Text
+                        style={[
+                          styles.roleText,
+                          user.role === 'admin' && styles.roleTextAdmin,
+                        ]}
+                      >
+                        {user.role.toUpperCase()}
+                      </Text>
+                    </View>
+                  </View>
                 </View>
-              )}
-            </View>
+                {user.id !== profile?.id && (
+                  <View style={styles.userActions}>
+                    <TouchableOpacity
+                      style={styles.actionButton}
+                      onPress={() => handleToggleRole(user.id, user.role, user.email)}
+                    >
+                      <IconSymbol
+                        ios_icon_name="arrow.2.squarepath"
+                        android_material_icon_name="swap-horiz"
+                        size={20}
+                        color={colors.primary}
+                      />
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[styles.actionButton, styles.deleteButton]}
+                      onPress={() => handleDeleteUser(user.id, user.email)}
+                    >
+                      <IconSymbol
+                        ios_icon_name="trash.fill"
+                        android_material_icon_name="delete"
+                        size={20}
+                        color="#FF3B30"
+                      />
+                    </TouchableOpacity>
+                  </View>
+                )}
+              </View>
+            </React.Fragment>
           ))}
         </View>
       </ScrollView>
