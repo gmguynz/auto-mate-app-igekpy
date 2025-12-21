@@ -14,6 +14,7 @@ import {
 import { useRouter } from 'expo-router';
 import { colors } from '@/styles/commonStyles';
 import { IconSymbol } from '@/components/IconSymbol';
+import { AppFooter } from '@/components/AppFooter';
 import { Customer } from '@/types/customer';
 import { storageUtils } from '@/utils/storage';
 import { dateUtils } from '@/utils/dateUtils';
@@ -86,11 +87,9 @@ export default function RemindersScreen() {
         const inspectionDate = vehicle.inspectionDueDate;
         const serviceDate = vehicle.serviceDueDate;
 
-        // Check if both are due on the same day
         if (inspectionDate && serviceDate && inspectionDate === serviceDate) {
           const daysUntil = dateUtils.getDaysUntil(inspectionDate);
           if (daysUntil <= 30) {
-            // Merged reminder
             allReminders.push({
               customerId: customer.id,
               customerName: displayName,
@@ -110,7 +109,6 @@ export default function RemindersScreen() {
             });
           }
         } else {
-          // Separate reminders
           if (inspectionDate) {
             const daysUntil = dateUtils.getDaysUntil(inspectionDate);
             if (daysUntil <= 30) {
@@ -160,7 +158,6 @@ export default function RemindersScreen() {
       });
     });
 
-    // Sort by days until due (overdue first, then soonest)
     allReminders.sort((a, b) => {
       if (a.isOverdue && !b.isOverdue) return -1;
       if (!a.isOverdue && b.isOverdue) return 1;
@@ -184,28 +181,32 @@ export default function RemindersScreen() {
     setSendingEmail(reminder.vehicleId);
 
     try {
-      // Determine service type text for the email
-      let serviceType = '';
+      let dueItems = '';
       if (reminder.isMerged) {
-        serviceType = 'WOF and service';
+        dueItems = 'WOF and service';
       } else if (reminder.types[0] === 'inspection') {
-        serviceType = 'WOF';
+        dueItems = 'WOF';
       } else {
-        serviceType = 'service';
+        dueItems = 'service';
       }
       
       const subject = reminder.isMerged
         ? `WOF & Service Reminder - ${reminder.vehicleReg}`
         : `${reminder.types[0] === 'inspection' ? 'WOF' : 'Service'} Reminder - ${reminder.vehicleReg}`;
       
-      // New email template as requested
-      const body = `Dear ${reminder.customerName}
+      const dueDate = new Date(reminder.dueDate);
+      const dayName = dueDate.toLocaleDateString('en-NZ', { weekday: 'long' });
+      const day = dueDate.getDate();
+      const monthName = dueDate.toLocaleDateString('en-NZ', { month: 'long' });
+      const year = dueDate.getFullYear();
+      
+      const body = `Dear ${reminder.customerName},
 
-This is a reminder that your vehicle ${reminder.vehicleReg} ${reminder.vehicleMake}/${reminder.vehicleModel} is due for ${serviceType} on ${dateUtils.formatDate(reminder.dueDate)}
+This is a friendly reminder that your vehicle ${reminder.vehicleReg} - ${reminder.vehicleMake} ${reminder.vehicleModel} is due for ${dueItems} on ${dayName} ${day} ${monthName} ${year}.
 
-Please call us on 07-8662218 to book an appointment
+Please call us on 07 866 2218 to book an appointment.
 
-Best regards,
+Regards,
 Charlie's Workshop`;
 
       console.log('Sending automated email...');
@@ -219,7 +220,6 @@ Charlie's Workshop`;
       if (result.success) {
         Alert.alert('Success', `Email sent successfully to ${reminder.customerName}`);
       } else {
-        // Show detailed error with troubleshooting option
         Alert.alert(
           'Email Failed',
           result.error || 'Failed to send email',
@@ -298,7 +298,6 @@ Charlie's Workshop`;
       return;
     }
 
-    // Only show automated email option
     Alert.alert(
       'Send Email Reminder',
       `Send automated email reminder to ${reminder.customerName}?`,
@@ -509,6 +508,8 @@ Charlie's Workshop`;
             </Text>
           </View>
         )}
+
+        <AppFooter />
       </ScrollView>
     </View>
   );

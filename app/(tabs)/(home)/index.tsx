@@ -4,6 +4,7 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, TextInput 
 import { useRouter } from 'expo-router';
 import { colors } from '@/styles/commonStyles';
 import { IconSymbol } from '@/components/IconSymbol';
+import { AppFooter } from '@/components/AppFooter';
 import { storageUtils } from '@/utils/storage';
 import { SupabaseSetupGuide } from '@/components/SupabaseSetupGuide';
 import { dateUtils } from '@/utils/dateUtils';
@@ -22,6 +23,7 @@ export default function HomeScreen() {
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [customers, setCustomers] = useState<Customer[]>([]);
+  const [isAboutExpanded, setIsAboutExpanded] = useState(false);
 
   useEffect(() => {
     initializeScreen();
@@ -449,40 +451,56 @@ export default function HomeScreen() {
           </TouchableOpacity>
         </View>
 
-        <View style={styles.infoSection}>
-          <Text style={styles.infoTitle}>About This App</Text>
-          <Text style={styles.infoText}>
-            This customer database app helps mechanics manage customer information, vehicle details, and service reminders. 
-            {'\n\n'}
-            Features include:
-          </Text>
-          <View style={styles.featureList}>
-            <View style={styles.featureItem}>
-              <Text style={styles.featureBullet}>•</Text>
-              <Text style={styles.featureText}>Secure user authentication and access control</Text>
-            </View>
-            <View style={styles.featureItem}>
-              <Text style={styles.featureBullet}>•</Text>
-              <Text style={styles.featureText}>Store customer and vehicle information</Text>
-            </View>
-            <View style={styles.featureItem}>
-              <Text style={styles.featureBullet}>•</Text>
-              <Text style={styles.featureText}>Track WOF inspection and service due dates</Text>
-            </View>
-            <View style={styles.featureItem}>
-              <Text style={styles.featureBullet}>•</Text>
-              <Text style={styles.featureText}>Automated reminders 14 days before due dates</Text>
-            </View>
-            <View style={styles.featureItem}>
-              <Text style={styles.featureBullet}>•</Text>
-              <Text style={styles.featureText}>Search by name, company, or vehicle registration</Text>
-            </View>
-            <View style={styles.featureItem}>
-              <Text style={styles.featureBullet}>•</Text>
-              <Text style={styles.featureText}>Cloud storage with Supabase</Text>
-            </View>
+        <TouchableOpacity
+          style={styles.infoSection}
+          onPress={() => setIsAboutExpanded(!isAboutExpanded)}
+          activeOpacity={0.7}
+        >
+          <View style={styles.infoHeader}>
+            <Text style={styles.infoTitle}>About This App</Text>
+            <IconSymbol
+              ios_icon_name={isAboutExpanded ? "chevron.up" : "chevron.down"}
+              android_material_icon_name={isAboutExpanded ? "expand-less" : "expand-more"}
+              size={24}
+              color={colors.text}
+            />
           </View>
-        </View>
+          {isAboutExpanded && (
+            <View style={styles.infoContent}>
+              <Text style={styles.infoText}>
+                This customer database app helps mechanics manage customer information, vehicle details, and service reminders.
+                {'\n\n'}
+                Features include:
+              </Text>
+              <View style={styles.featureList}>
+                <View style={styles.featureItem}>
+                  <Text style={styles.featureBullet}>•</Text>
+                  <Text style={styles.featureText}>Secure user authentication and access control</Text>
+                </View>
+                <View style={styles.featureItem}>
+                  <Text style={styles.featureBullet}>•</Text>
+                  <Text style={styles.featureText}>Store customer and vehicle information</Text>
+                </View>
+                <View style={styles.featureItem}>
+                  <Text style={styles.featureBullet}>•</Text>
+                  <Text style={styles.featureText}>Track WOF inspection and service due dates</Text>
+                </View>
+                <View style={styles.featureItem}>
+                  <Text style={styles.featureBullet}>•</Text>
+                  <Text style={styles.featureText}>Automated reminders 14 days before due dates</Text>
+                </View>
+                <View style={styles.featureItem}>
+                  <Text style={styles.featureBullet}>•</Text>
+                  <Text style={styles.featureText}>Search by name, company, or vehicle registration</Text>
+                </View>
+                <View style={styles.featureItem}>
+                  <Text style={styles.featureBullet}>•</Text>
+                  <Text style={styles.featureText}>Cloud storage with Supabase</Text>
+                </View>
+              </View>
+            </View>
+          )}
+        </TouchableOpacity>
 
         {isSupabaseConfigured && (
           <View style={styles.successCard}>
@@ -527,6 +545,8 @@ export default function HomeScreen() {
             />
           </TouchableOpacity>
         )}
+
+        <AppFooter />
       </ScrollView>
     </View>
   );
@@ -775,11 +795,18 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     marginBottom: 16,
   },
+  infoHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
   infoTitle: {
     fontSize: 18,
     fontWeight: 'bold',
     color: colors.text,
-    marginBottom: 12,
+  },
+  infoContent: {
+    marginTop: 12,
   },
   infoText: {
     fontSize: 14,
