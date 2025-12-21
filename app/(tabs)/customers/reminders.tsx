@@ -183,11 +183,11 @@ export default function RemindersScreen() {
     try {
       let dueItems = '';
       if (reminder.isMerged) {
-        dueItems = 'WOF and service';
+        dueItems = 'WOF and Service';
       } else if (reminder.types[0] === 'inspection') {
         dueItems = 'WOF';
       } else {
-        dueItems = 'service';
+        dueItems = 'Service';
       }
       
       const subject = reminder.isMerged
