@@ -49,6 +49,8 @@ export const emailService = {
             },
           });
 
+          console.log('Edge Function response:', { data, error });
+
           if (error) {
             console.error('Error invoking Edge Function:', error);
             console.error('Error details:', JSON.stringify(error, null, 2));
@@ -96,12 +98,14 @@ export const emailService = {
             let errorMessage = 'Email service error';
             if (data.error.message) {
               errorMessage = data.error.message;
+            } else if (typeof data.error === 'string') {
+              errorMessage = data.error;
             }
             
             // Check for specific Resend errors
-            if (data.error.message?.includes('domain')) {
+            if (errorMessage.includes('domain')) {
               errorMessage = 'Email domain not verified. Please verify your domain in Resend dashboard.';
-            } else if (data.error.message?.includes('API key')) {
+            } else if (errorMessage.includes('API key')) {
               errorMessage = 'Invalid Resend API key. Please check your RESEND_API_KEY in Supabase secrets.';
             }
             
@@ -111,15 +115,16 @@ export const emailService = {
             };
           }
 
-          // Check if we got an ID back from Resend (indicates success)
-          if (data && data.id) {
-            console.log('Email sent successfully. Resend ID:', data.id);
+          // Check for success response (Edge Function returns { success: true, id: ..., message: ... })
+          if (data && (data.success === true || data.id)) {
+            console.log('Email sent successfully. Response:', data);
             return { success: true };
           }
 
           // If we got here and it's not the last attempt, retry
           if (attempt < MAX_EMAIL_RETRIES) {
             console.warn('Unexpected response from email service, retrying...');
+            console.warn('Response data:', JSON.stringify(data, null, 2));
             await new Promise(resolve => setTimeout(resolve, EMAIL_RETRY_DELAY));
             continue;
           }

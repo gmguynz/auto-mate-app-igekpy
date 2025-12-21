@@ -211,6 +211,8 @@ Regards,
 Charlie's Workshop`;
 
       console.log('Sending automated email to:', reminder.customerEmail);
+      console.log('Email body:', body);
+      
       const result = await emailService.sendEmail({
         to: reminder.customerEmail,
         subject,
@@ -218,13 +220,19 @@ Charlie's Workshop`;
         customerName: reminder.customerName,
       });
 
+      console.log('Email send result:', result);
+
       if (result.success) {
-        Alert.alert('Success', `Email sent successfully to ${reminder.customerName}`);
+        Alert.alert(
+          'Email Sent Successfully',
+          `Reminder email has been sent to ${reminder.customerName} at ${reminder.customerEmail}`,
+          [{ text: 'OK' }]
+        );
       } else {
         console.error('Email send failed:', result.error);
         Alert.alert(
           'Email Failed',
-          result.error || 'Failed to send email',
+          result.error || 'Failed to send email. Please check your email configuration.',
           [
             { text: 'Cancel', style: 'cancel' },
             {
@@ -238,7 +246,7 @@ Charlie's Workshop`;
       console.error('Error sending email:', error);
       Alert.alert(
         'Error',
-        'An unexpected error occurred while sending the email',
+        'An unexpected error occurred while sending the email. Please try again.',
         [
           { text: 'Cancel', style: 'cancel' },
           {
@@ -302,7 +310,7 @@ Charlie's Workshop`;
 
     Alert.alert(
       'Send Email Reminder',
-      `Send automated email reminder to ${reminder.customerName}?`,
+      `Send automated email reminder to ${reminder.customerName} at ${reminder.customerEmail}?`,
       [
         { text: 'Cancel', style: 'cancel' },
         {

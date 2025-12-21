@@ -702,11 +702,12 @@ export default function CustomerDetailScreen() {
       >
         <View style={styles.modalOverlay}>
           <View style={styles.transferModalContent}>
-            <View style={styles.modalHeader}>
+            <View style={styles.transferModalHeader}>
               <Text style={styles.modalTitle}>Transfer Vehicle</Text>
               <TouchableOpacity 
                 onPress={() => setShowTransferModal(false)} 
                 activeOpacity={0.7}
+                style={styles.closeButton}
               >
                 <IconSymbol
                   ios_icon_name="xmark.circle.fill"
@@ -950,6 +951,9 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 8,
+    paddingBottom: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
   },
   vehicleTitle: {
     fontSize: 16,
@@ -964,10 +968,10 @@ const styles = StyleSheet.create({
   transferButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: 6,
     paddingHorizontal: 12,
-    paddingVertical: 6,
-    backgroundColor: colors.highlight,
+    paddingVertical: 8,
+    backgroundColor: colors.primary,
     borderRadius: 8,
     cursor: Platform.OS === 'web' ? 'pointer' : undefined,
     userSelect: Platform.OS === 'web' ? 'none' : undefined,
@@ -975,7 +979,7 @@ const styles = StyleSheet.create({
   transferButtonText: {
     fontSize: 14,
     fontWeight: '600',
-    color: colors.primary,
+    color: '#FFFFFF',
     userSelect: Platform.OS === 'web' ? 'none' : undefined,
   },
   dateButton: {
@@ -1097,10 +1101,28 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     maxHeight: '80%',
+    ...(Platform.OS === 'web' && {
+      maxWidth: 600,
+      alignSelf: 'center',
+      width: '100%',
+    }),
+  },
+  transferModalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
   },
   transferModalBody: {
     padding: 20,
     flex: 1,
+  },
+  closeButton: {
+    padding: 4,
+    cursor: Platform.OS === 'web' ? 'pointer' : undefined,
+    userSelect: Platform.OS === 'web' ? 'none' : undefined,
   },
   transferInfo: {
     backgroundColor: colors.highlight,
