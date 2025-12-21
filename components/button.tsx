@@ -1,3 +1,4 @@
+
 import React from "react";
 import {
   ActivityIndicator,
@@ -7,6 +8,7 @@ import {
   TextStyle,
   useColorScheme,
   ViewStyle,
+  Platform,
 } from "react-native";
 import { appleBlue, zincColors } from "@/constants/Colors";
 
@@ -99,7 +101,9 @@ export const Button: React.FC<ButtonProps> = ({
           height: sizeStyles[size].height,
           paddingHorizontal: sizeStyles[size].padding,
           opacity: disabled ? 0.5 : 1,
-        },
+          cursor: Platform.OS === 'web' ? (disabled || loading ? 'not-allowed' : 'pointer') : undefined,
+          userSelect: Platform.OS === 'web' ? 'none' : undefined,
+        } as ViewStyle,
         style,
       ]}
     >
@@ -114,7 +118,8 @@ export const Button: React.FC<ButtonProps> = ({
               textAlign: "center",
               marginBottom: 0,
               fontWeight: "700",
-            },
+              userSelect: Platform.OS === 'web' ? 'none' : undefined,
+            } as TextStyle,
             textStyle,
           ])}
         >

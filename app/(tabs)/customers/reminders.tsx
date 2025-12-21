@@ -10,6 +10,7 @@ import {
   Linking,
   RefreshControl,
   ActivityIndicator,
+  Platform,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { colors } from '@/styles/commonStyles';
@@ -329,7 +330,7 @@ Charlie's Workshop`;
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+        <TouchableOpacity onPress={() => router.back()} style={styles.backButton} activeOpacity={0.7}>
           <IconSymbol
             ios_icon_name="chevron.left"
             android_material_icon_name="arrow-back"
@@ -533,6 +534,8 @@ const styles = StyleSheet.create({
   },
   backButton: {
     padding: 8,
+    cursor: Platform.OS === 'web' ? 'pointer' : undefined,
+    userSelect: Platform.OS === 'web' ? 'none' : undefined,
   },
   title: {
     fontSize: 20,
@@ -615,6 +618,8 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     boxShadow: '0px 2px 4px rgba(0, 0, 0, 0.05)',
     elevation: 2,
+    cursor: Platform.OS === 'web' ? 'pointer' : undefined,
+    userSelect: Platform.OS === 'web' ? 'none' : undefined,
   },
   overdueCard: {
     borderColor: colors.error,
@@ -633,21 +638,25 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: colors.text,
     marginBottom: 4,
+    userSelect: Platform.OS === 'web' ? 'none' : undefined,
   },
   reminderVehicle: {
     fontSize: 14,
     color: colors.textSecondary,
     marginBottom: 4,
+    userSelect: Platform.OS === 'web' ? 'none' : undefined,
   },
   reminderType: {
     fontSize: 14,
     fontWeight: '600',
     color: colors.text,
     marginBottom: 2,
+    userSelect: Platform.OS === 'web' ? 'none' : undefined,
   },
   reminderDate: {
     fontSize: 13,
     color: colors.textSecondary,
+    userSelect: Platform.OS === 'web' ? 'none' : undefined,
   },
   emptyState: {
     alignItems: 'center',

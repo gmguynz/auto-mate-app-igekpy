@@ -11,6 +11,7 @@ import {
   ActivityIndicator,
   Modal,
   RefreshControl,
+  Platform,
 } from 'react-native';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
@@ -393,6 +394,7 @@ export default function AdminScreen() {
         <TouchableOpacity
           style={styles.createButton}
           onPress={() => setShowCreateModal(true)}
+          activeOpacity={0.7}
         >
           <IconSymbol
             ios_icon_name="person.badge.plus.fill"
@@ -458,6 +460,7 @@ export default function AdminScreen() {
                   <TouchableOpacity
                     style={styles.actionButton}
                     onPress={() => handleEditUser(user)}
+                    activeOpacity={0.7}
                   >
                     <IconSymbol
                       ios_icon_name="pencil"
@@ -469,6 +472,7 @@ export default function AdminScreen() {
                   <TouchableOpacity
                     style={styles.actionButton}
                     onPress={() => handleSendPasswordReset(user.email)}
+                    activeOpacity={0.7}
                   >
                     <IconSymbol
                       ios_icon_name="envelope.fill"
@@ -482,6 +486,7 @@ export default function AdminScreen() {
                       <TouchableOpacity
                         style={styles.actionButton}
                         onPress={() => handleToggleRole(user.id, user.role, user.email)}
+                        activeOpacity={0.7}
                       >
                         <IconSymbol
                           ios_icon_name="arrow.2.squarepath"
@@ -493,6 +498,7 @@ export default function AdminScreen() {
                       <TouchableOpacity
                         style={[styles.actionButton, styles.deleteButton]}
                         onPress={() => handleDeleteUser(user.id, user.email)}
+                        activeOpacity={0.7}
                       >
                         <IconSymbol
                           ios_icon_name="trash.fill"
@@ -521,7 +527,7 @@ export default function AdminScreen() {
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Create New User</Text>
-              <TouchableOpacity onPress={() => setShowCreateModal(false)}>
+              <TouchableOpacity onPress={() => setShowCreateModal(false)} activeOpacity={0.7}>
                 <IconSymbol
                   ios_icon_name="xmark.circle.fill"
                   android_material_icon_name="close"
@@ -597,6 +603,7 @@ export default function AdminScreen() {
                     ]}
                     onPress={() => setNewUserRole('user')}
                     disabled={creating}
+                    activeOpacity={0.7}
                   >
                     <Text
                       style={[
@@ -614,6 +621,7 @@ export default function AdminScreen() {
                     ]}
                     onPress={() => setNewUserRole('admin')}
                     disabled={creating}
+                    activeOpacity={0.7}
                   >
                     <Text
                       style={[
@@ -631,6 +639,7 @@ export default function AdminScreen() {
                 style={[styles.submitButton, creating && styles.submitButtonDisabled]}
                 onPress={handleCreateUser}
                 disabled={creating}
+                activeOpacity={0.7}
               >
                 {creating ? (
                   <ActivityIndicator color="#FFFFFF" />
@@ -654,7 +663,7 @@ export default function AdminScreen() {
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Edit User</Text>
-              <TouchableOpacity onPress={() => setShowEditModal(false)}>
+              <TouchableOpacity onPress={() => setShowEditModal(false)} activeOpacity={0.7}>
                 <IconSymbol
                   ios_icon_name="xmark.circle.fill"
                   android_material_icon_name="close"
@@ -712,6 +721,7 @@ export default function AdminScreen() {
                     ]}
                     onPress={() => setNewUserRole('user')}
                     disabled={updating || editingUser?.id === profile?.id}
+                    activeOpacity={0.7}
                   >
                     <Text
                       style={[
@@ -729,6 +739,7 @@ export default function AdminScreen() {
                     ]}
                     onPress={() => setNewUserRole('admin')}
                     disabled={updating || editingUser?.id === profile?.id}
+                    activeOpacity={0.7}
                   >
                     <Text
                       style={[
@@ -751,6 +762,7 @@ export default function AdminScreen() {
                 style={[styles.submitButton, updating && styles.submitButtonDisabled]}
                 onPress={handleUpdateUser}
                 disabled={updating}
+                activeOpacity={0.7}
               >
                 {updating ? (
                   <ActivityIndicator color="#FFFFFF" />
@@ -811,11 +823,14 @@ const styles = StyleSheet.create({
     padding: 16,
     marginBottom: 24,
     gap: 8,
+    cursor: Platform.OS === 'web' ? 'pointer' : undefined,
+    userSelect: Platform.OS === 'web' ? 'none' : undefined,
   },
   createButtonText: {
     color: '#FFFFFF',
     fontSize: 16,
     fontWeight: '600',
+    userSelect: Platform.OS === 'web' ? 'none' : undefined,
   },
   statsContainer: {
     flexDirection: 'row',
@@ -921,6 +936,8 @@ const styles = StyleSheet.create({
     backgroundColor: colors.highlight,
     alignItems: 'center',
     justifyContent: 'center',
+    cursor: Platform.OS === 'web' ? 'pointer' : undefined,
+    userSelect: Platform.OS === 'web' ? 'none' : undefined,
   },
   deleteButton: {
     backgroundColor: '#FFE5E5',
@@ -969,6 +986,8 @@ const styles = StyleSheet.create({
     padding: 16,
     fontSize: 16,
     color: colors.text,
+    cursor: Platform.OS === 'web' ? 'text' : undefined,
+    outlineStyle: Platform.OS === 'web' ? 'none' : undefined,
   },
   inputDisabled: {
     opacity: 0.6,
@@ -990,6 +1009,8 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: colors.border,
     alignItems: 'center',
+    cursor: Platform.OS === 'web' ? 'pointer' : undefined,
+    userSelect: Platform.OS === 'web' ? 'none' : undefined,
   },
   roleOptionSelected: {
     borderColor: colors.primary,
@@ -999,6 +1020,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: colors.textSecondary,
+    userSelect: Platform.OS === 'web' ? 'none' : undefined,
   },
   roleOptionTextSelected: {
     color: colors.primary,
@@ -1009,13 +1031,17 @@ const styles = StyleSheet.create({
     padding: 16,
     alignItems: 'center',
     marginTop: 12,
+    cursor: Platform.OS === 'web' ? 'pointer' : undefined,
+    userSelect: Platform.OS === 'web' ? 'none' : undefined,
   },
   submitButtonDisabled: {
     opacity: 0.6,
+    cursor: Platform.OS === 'web' ? 'not-allowed' : undefined,
   },
   submitButtonText: {
     color: '#FFFFFF',
     fontSize: 16,
     fontWeight: '600',
+    userSelect: Platform.OS === 'web' ? 'none' : undefined,
   },
 });
