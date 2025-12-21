@@ -36,26 +36,46 @@ export default function LoginScreen() {
     try {
       let email = identifier;
 
+      // If identifier doesn't contain @, it's a user_id - look it up via Edge Function
       if (!identifier.includes('@')) {
-        console.log('Identifier is not an email, looking up user_id:', identifier);
-        const { data, error } = await supabase
-          .from('user_profiles')
-          .select('email')
-          .eq('user_id', identifier)
-          .single();
+        console.log('Identifier is not an email, looking up user_id via Edge Function:', identifier);
+        
+        try {
+          const { data, error } = await supabase.functions.invoke('lookup-user-id', {
+            body: { user_id: identifier }
+          });
 
-        if (error || !data) {
-          console.error('User ID lookup error:', error);
+          if (error) {
+            console.error('User ID lookup error:', error);
+            Alert.alert(
+              'Login Failed',
+              'Invalid user ID or password. Please try again.'
+            );
+            setLoading(false);
+            return;
+          }
+
+          if (!data || !data.email) {
+            console.error('No email found for user_id:', identifier);
+            Alert.alert(
+              'Login Failed',
+              'Invalid user ID or password. Please try again.'
+            );
+            setLoading(false);
+            return;
+          }
+
+          email = data.email;
+          console.log('Found email for user_id:', email);
+        } catch (lookupError) {
+          console.error('Exception during user ID lookup:', lookupError);
           Alert.alert(
             'Login Failed',
-            'Invalid user ID or password. Please try again.'
+            'Unable to verify user ID. Please try again or use your email address.'
           );
           setLoading(false);
           return;
         }
-
-        email = data.email;
-        console.log('Found email for user_id:', email);
       }
 
       const { error } = await signIn(email, password);

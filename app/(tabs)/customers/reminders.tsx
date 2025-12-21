@@ -8,7 +8,6 @@ import {
   TouchableOpacity,
   Alert,
   Linking,
-  Platform,
   RefreshControl,
   ActivityIndicator,
 } from 'react-native';
@@ -30,6 +29,8 @@ interface Reminder {
   customerMobile: string;
   vehicleId: string;
   vehicleReg: string;
+  vehicleMake: string;
+  vehicleModel: string;
   vehicleDetails: string;
   types: ('inspection' | 'service')[];
   dueDate: string;
@@ -98,6 +99,8 @@ export default function RemindersScreen() {
               customerMobile: customer.mobile,
               vehicleId: vehicle.id,
               vehicleReg: vehicle.registrationNumber,
+              vehicleMake: vehicle.make,
+              vehicleModel: vehicle.model,
               vehicleDetails: `${vehicle.year} ${vehicle.make} ${vehicle.model}`,
               types: ['inspection', 'service'],
               dueDate: inspectionDate,
@@ -119,6 +122,8 @@ export default function RemindersScreen() {
                 customerMobile: customer.mobile,
                 vehicleId: vehicle.id,
                 vehicleReg: vehicle.registrationNumber,
+                vehicleMake: vehicle.make,
+                vehicleModel: vehicle.model,
                 vehicleDetails: `${vehicle.year} ${vehicle.make} ${vehicle.model}`,
                 types: ['inspection'],
                 dueDate: inspectionDate,
@@ -140,6 +145,8 @@ export default function RemindersScreen() {
                 customerMobile: customer.mobile,
                 vehicleId: vehicle.id,
                 vehicleReg: vehicle.registrationNumber,
+                vehicleMake: vehicle.make,
+                vehicleModel: vehicle.model,
                 vehicleDetails: `${vehicle.year} ${vehicle.make} ${vehicle.model}`,
                 types: ['service'],
                 dueDate: serviceDate,
@@ -177,15 +184,29 @@ export default function RemindersScreen() {
     setSendingEmail(reminder.vehicleId);
 
     try {
-      const typeText = reminder.isMerged 
-        ? 'inspection and service' 
-        : reminder.types[0];
+      // Determine service type text for the email
+      let serviceType = '';
+      if (reminder.isMerged) {
+        serviceType = 'WOF and service';
+      } else if (reminder.types[0] === 'inspection') {
+        serviceType = 'WOF';
+      } else {
+        serviceType = 'service';
+      }
       
       const subject = reminder.isMerged
-        ? `Inspection & Service Reminder - ${reminder.vehicleReg}`
-        : `${reminder.types[0] === 'inspection' ? 'Inspection' : 'Service'} Reminder - ${reminder.vehicleReg}`;
+        ? `WOF & Service Reminder - ${reminder.vehicleReg}`
+        : `${reminder.types[0] === 'inspection' ? 'WOF' : 'Service'} Reminder - ${reminder.vehicleReg}`;
       
-      const body = `Dear ${reminder.customerName},\n\nThis is a reminder that your vehicle ${reminder.vehicleReg} (${reminder.vehicleDetails}) is ${reminder.isOverdue ? 'overdue' : 'due soon'} for ${typeText}.\n\nDue Date: ${dateUtils.formatDate(reminder.dueDate)}\n\nPlease contact us to schedule an appointment.\n\nBest regards,\nYour Mechanic Shop`;
+      // New email template as requested
+      const body = `Dear ${reminder.customerName}
+
+This is a reminder that your vehicle ${reminder.vehicleReg} ${reminder.vehicleMake}/${reminder.vehicleModel} is due for ${serviceType} on ${dateUtils.formatDate(reminder.dueDate)}
+
+Please call us on 07-8662218 to book an appointment
+
+Best regards,
+Charlie's Workshop`;
 
       console.log('Sending automated email...');
       const result = await emailService.sendEmail({
@@ -253,109 +274,51 @@ export default function RemindersScreen() {
     );
   };
 
-  const sendEmailViaClient = (reminder: Reminder) => {
-    const typeText = reminder.isMerged 
-      ? 'inspection and service' 
-      : reminder.types[0];
-    
-    const subject = reminder.isMerged
-      ? `Inspection & Service Reminder - ${reminder.vehicleReg}`
-      : `${reminder.types[0] === 'inspection' ? 'Inspection' : 'Service'} Reminder - ${reminder.vehicleReg}`;
-    
-    const body = `Dear ${reminder.customerName},\n\nThis is a reminder that your vehicle ${reminder.vehicleReg} (${reminder.vehicleDetails}) is ${reminder.isOverdue ? 'overdue' : 'due soon'} for ${typeText}.\n\nDue Date: ${dateUtils.formatDate(reminder.dueDate)}\n\nPlease contact us to schedule an appointment.\n\nBest regards,\nYour Mechanic Shop`;
-
-    const url = `mailto:${reminder.customerEmail}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-    
-    Linking.canOpenURL(url)
-      .then((supported) => {
-        if (supported) {
-          Linking.openURL(url);
-        } else {
-          Alert.alert('Error', 'Unable to open email client');
-        }
-      })
-      .catch((err) => {
-        console.error('Error opening email:', err);
-        Alert.alert('Error', 'Unable to send email');
-      });
-  };
-
-  const sendSmsReminder = (reminder: Reminder) => {
-    const phoneNumber = reminder.customerMobile || reminder.customerPhone;
-    if (!phoneNumber) {
-      Alert.alert('Error', 'No phone number available for this customer');
-      return;
-    }
-
-    const typeText = reminder.isMerged 
-      ? 'inspection & service' 
-      : reminder.types[0];
-
-    const message = `Hi ${reminder.customerName}, your vehicle ${reminder.vehicleReg} is ${reminder.isOverdue ? 'overdue' : 'due soon'} for ${typeText}. Due: ${dateUtils.formatDate(reminder.dueDate)}. Please contact us to schedule.`;
-
-    const url = `sms:${phoneNumber}${Platform.OS === 'ios' ? '&' : '?'}body=${encodeURIComponent(message)}`;
-    
-    Linking.canOpenURL(url)
-      .then((supported) => {
-        if (supported) {
-          Linking.openURL(url);
-        } else {
-          Alert.alert('Error', 'Unable to open SMS app');
-        }
-      })
-      .catch((err) => {
-        console.error('Error opening SMS:', err);
-        Alert.alert('Error', 'Unable to send SMS');
-      });
-  };
-
   const handleSendReminder = (reminder: Reminder) => {
-    const hasPhone = reminder.customerPhone || reminder.customerMobile;
     const hasEmail = reminder.customerEmail;
     const supabaseConfigured = isSupabaseConfigured();
 
-    if (!hasEmail && !hasPhone) {
-      Alert.alert('Error', 'No contact information available for this customer');
+    if (!hasEmail) {
+      Alert.alert('Error', 'No email address available for this customer');
       return;
     }
 
-    const buttons: any[] = [{ text: 'Cancel', style: 'cancel' }];
-
-    if (hasEmail && supabaseConfigured) {
-      buttons.push({
-        text: 'Send Email (Auto)',
-        onPress: () => sendAutomatedEmail(reminder),
-      });
+    if (!supabaseConfigured) {
+      Alert.alert(
+        'Email Service Not Configured',
+        'Automated email reminders require Supabase configuration. Please set up the email service to send reminders.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Setup Instructions',
+            onPress: () => emailService.showSetupInstructions(),
+          },
+        ]
+      );
+      return;
     }
 
-    if (hasEmail) {
-      buttons.push({
-        text: supabaseConfigured ? 'Email (Client)' : 'Email',
-        onPress: () => sendEmailViaClient(reminder),
-      });
-    }
-
-    if (hasPhone) {
-      buttons.push({
-        text: 'SMS',
-        onPress: () => sendSmsReminder(reminder),
-      });
-    }
-
+    // Only show automated email option
     Alert.alert(
-      'Send Reminder',
-      `Send reminder to ${reminder.customerName}?`,
-      buttons
+      'Send Email Reminder',
+      `Send automated email reminder to ${reminder.customerName}?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Send Email',
+          onPress: () => sendAutomatedEmail(reminder),
+        },
+      ]
     );
   };
 
   const getReminderTypeText = (reminder: Reminder) => {
     if (reminder.isMerged) {
       return reminder.isOverdue 
-        ? 'Inspection & Service OVERDUE' 
-        : `Inspection & Service due in ${reminder.daysUntil} days`;
+        ? 'WOF & Service OVERDUE' 
+        : `WOF & Service due in ${reminder.daysUntil} days`;
     }
-    const type = reminder.types[0] === 'inspection' ? 'Inspection' : 'Service';
+    const type = reminder.types[0] === 'inspection' ? 'WOF' : 'Service';
     return reminder.isOverdue 
       ? `${type} OVERDUE` 
       : `${type} due in ${reminder.daysUntil} days`;
@@ -401,14 +364,14 @@ export default function RemindersScreen() {
             {notificationStats.total} notifications scheduled automatically
           </Text>
           <Text style={styles.automationSubtext}>
-            • {notificationStats.inspections} inspection reminders
+            • {notificationStats.inspections} WOF reminders
           </Text>
           <Text style={styles.automationSubtext}>
             • {notificationStats.services} service reminders
           </Text>
           {notificationStats.merged > 0 && (
             <Text style={styles.automationSubtext}>
-              • {notificationStats.merged} merged reminders (inspection & service on same day)
+              • {notificationStats.merged} merged reminders (WOF & service on same day)
             </Text>
           )}
           <Text style={styles.automationInfo}>
@@ -425,8 +388,8 @@ export default function RemindersScreen() {
           />
           <Text style={styles.infoText}>
             {isSupabaseConfigured() 
-              ? 'Tap a reminder to send automated email or SMS to the customer.'
-              : 'Tap a reminder to send email (via client) or SMS. Set up Supabase for automated emails.'}
+              ? 'Tap a reminder to send an automated email to the customer.'
+              : 'Set up Supabase email service to send automated email reminders.'}
           </Text>
         </View>
 
