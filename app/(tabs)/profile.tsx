@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -7,32 +7,61 @@ import {
   ScrollView,
   TouchableOpacity,
   Alert,
+  ActivityIndicator,
 } from 'react-native';
-import { useRouter } from 'expo-router';
 import { useAuth } from '@/contexts/AuthContext';
 import { colors } from '@/styles/commonStyles';
 import { IconSymbol } from '@/components/IconSymbol';
+import { useRouter } from 'expo-router';
 
 export default function ProfileScreen() {
+  const { user, profile, session, isAdmin, signOut, refreshProfile } = useAuth();
   const router = useRouter();
-  const { user, profile, signOut, isAdmin } = useAuth();
+  const [refreshing, setRefreshing] = useState(false);
 
-  const handleSignOut = () => {
-    Alert.alert(
-      'Sign Out',
-      'Are you sure you want to sign out?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Sign Out',
-          style: 'destructive',
-          onPress: async () => {
-            await signOut();
-            router.replace('/(auth)/login');
-          },
+  const handleSignOut = async () => {
+    Alert.alert('Sign Out', 'Are you sure you want to sign out?', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Sign Out',
+        style: 'destructive',
+        onPress: async () => {
+          await signOut();
+          router.replace('/(auth)/login');
         },
-      ]
-    );
+      },
+    ]);
+  };
+
+  const handleRefreshProfile = async () => {
+    setRefreshing(true);
+    try {
+      await refreshProfile();
+      Alert.alert('Success', 'Profile refreshed successfully');
+    } catch (error) {
+      console.error('Error refreshing profile:', error);
+      Alert.alert('Error', 'Failed to refresh profile');
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
+  const handleViewMetadata = () => {
+    const metadata = {
+      'User ID': user?.id,
+      'Email': user?.email,
+      'Profile Role': profile?.role,
+      'JWT Role (app_metadata)': session?.user?.app_metadata?.role,
+      'JWT Role (user_metadata)': session?.user?.user_metadata?.role,
+      'Is Admin': isAdmin ? 'Yes' : 'No',
+      'Last Sign In': user?.last_sign_in_at,
+    };
+
+    const metadataText = Object.entries(metadata)
+      .map(([key, value]) => `${key}: ${value || 'N/A'}`)
+      .join('\n\n');
+
+    Alert.alert('User Metadata', metadataText);
   };
 
   return (
@@ -45,17 +74,17 @@ export default function ProfileScreen() {
         <View style={styles.header}>
           <View style={styles.avatarContainer}>
             <IconSymbol
-              ios_icon_name="person.fill"
-              android_material_icon_name="person"
-              size={48}
+              ios_icon_name="person.circle.fill"
+              android_material_icon_name="account-circle"
+              size={80}
               color={colors.primary}
             />
           </View>
-          <Text style={styles.name}>{profile?.full_name || 'User'}</Text>
+          <Text style={styles.name}>{profile?.full_name || 'No name'}</Text>
           <Text style={styles.email}>{user?.email}</Text>
           <View style={styles.roleBadge}>
-            <Text style={styles.roleText}>
-              {profile?.role === 'admin' ? 'ADMINISTRATOR' : 'USER'}
+            <Text style={[styles.roleText, isAdmin && styles.roleTextAdmin]}>
+              {isAdmin ? 'ADMIN' : 'USER'}
             </Text>
           </View>
         </View>
@@ -65,22 +94,23 @@ export default function ProfileScreen() {
           
           <View style={styles.infoCard}>
             <View style={styles.infoRow}>
+              <Text style={styles.infoLabel}>User ID</Text>
+              <Text style={styles.infoValue} numberOfLines={1}>
+                {user?.id?.substring(0, 20)}...
+              </Text>
+            </View>
+            <View style={styles.infoRow}>
               <Text style={styles.infoLabel}>Email</Text>
               <Text style={styles.infoValue}>{user?.email}</Text>
             </View>
-            <View style={styles.divider} />
             <View style={styles.infoRow}>
               <Text style={styles.infoLabel}>Full Name</Text>
               <Text style={styles.infoValue}>{profile?.full_name || 'Not set'}</Text>
             </View>
-            <View style={styles.divider} />
             <View style={styles.infoRow}>
               <Text style={styles.infoLabel}>Role</Text>
-              <Text style={styles.infoValue}>
-                {profile?.role === 'admin' ? 'Administrator' : 'User'}
-              </Text>
+              <Text style={styles.infoValue}>{profile?.role || 'Not set'}</Text>
             </View>
-            <View style={styles.divider} />
             <View style={styles.infoRow}>
               <Text style={styles.infoLabel}>Account Created</Text>
               <Text style={styles.infoValue}>
@@ -92,64 +122,54 @@ export default function ProfileScreen() {
           </View>
         </View>
 
-        {isAdmin && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Admin Actions</Text>
-            <TouchableOpacity
-              style={styles.actionCard}
-              onPress={() => router.push('/(tabs)/admin')}
-            >
-              <View style={styles.actionIcon}>
-                <IconSymbol
-                  ios_icon_name="person.3.fill"
-                  android_material_icon_name="people"
-                  size={24}
-                  color={colors.primary}
-                />
-              </View>
-              <View style={styles.actionContent}>
-                <Text style={styles.actionTitle}>User Management</Text>
-                <Text style={styles.actionDescription}>
-                  Create and manage user accounts
-                </Text>
-              </View>
-              <IconSymbol
-                ios_icon_name="chevron.right"
-                android_material_icon_name="chevron-right"
-                size={20}
-                color={colors.textSecondary}
-              />
-            </TouchableOpacity>
-          </View>
-        )}
-
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Security</Text>
-          <View style={styles.securityCard}>
+          <Text style={styles.sectionTitle}>Actions</Text>
+          
+          <TouchableOpacity
+            style={styles.actionButton}
+            onPress={handleRefreshProfile}
+            disabled={refreshing}
+          >
             <IconSymbol
-              ios_icon_name="lock.shield.fill"
-              android_material_icon_name="security"
-              size={32}
-              color={colors.success}
+              ios_icon_name="arrow.clockwise"
+              android_material_icon_name="refresh"
+              size={24}
+              color={colors.primary}
             />
-            <View style={styles.securityContent}>
-              <Text style={styles.securityTitle}>Account Secured</Text>
-              <Text style={styles.securityText}>
-                Your account is protected with email authentication. Only administrators can create new user accounts.
-              </Text>
-            </View>
-          </View>
-        </View>
+            <Text style={styles.actionButtonText}>
+              {refreshing ? 'Refreshing...' : 'Refresh Profile'}
+            </Text>
+            {refreshing && <ActivityIndicator size="small" color={colors.primary} />}
+          </TouchableOpacity>
 
-        <TouchableOpacity style={styles.signOutButton} onPress={handleSignOut}>
-          <IconSymbol
-            ios_icon_name="arrow.right.square.fill"
-            android_material_icon_name="logout"
-            size={24}
-            color="#FF3B30"
-          />
-          <Text style={styles.signOutButtonText}>Sign Out</Text>
-        </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.actionButton}
+            onPress={handleViewMetadata}
+          >
+            <IconSymbol
+              ios_icon_name="info.circle"
+              android_material_icon_name="info"
+              size={24}
+              color={colors.primary}
+            />
+            <Text style={styles.actionButtonText}>View Debug Info</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.actionButton, styles.signOutButton]}
+            onPress={handleSignOut}
+          >
+            <IconSymbol
+              ios_icon_name="rectangle.portrait.and.arrow.right"
+              android_material_icon_name="logout"
+              size={24}
+              color="#FF3B30"
+            />
+            <Text style={[styles.actionButtonText, styles.signOutButtonText]}>
+              Sign Out
+            </Text>
+          </TouchableOpacity>
+        </View>
       </ScrollView>
     </View>
   );
@@ -173,12 +193,6 @@ const styles = StyleSheet.create({
     marginBottom: 32,
   },
   avatarContainer: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    backgroundColor: colors.highlight,
-    alignItems: 'center',
-    justifyContent: 'center',
     marginBottom: 16,
   },
   name: {
@@ -201,6 +215,9 @@ const styles = StyleSheet.create({
   roleText: {
     fontSize: 12,
     fontWeight: '600',
+    color: colors.textSecondary,
+  },
+  roleTextAdmin: {
     color: colors.primary,
   },
   section: {
@@ -224,90 +241,43 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
   },
   infoLabel: {
     fontSize: 14,
     color: colors.textSecondary,
+    flex: 1,
   },
   infoValue: {
     fontSize: 14,
-    fontWeight: '600',
     color: colors.text,
+    fontWeight: '500',
+    flex: 1,
+    textAlign: 'right',
   },
-  divider: {
-    height: 1,
-    backgroundColor: colors.border,
-  },
-  actionCard: {
+  actionButton: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: colors.card,
     borderRadius: 12,
     padding: 16,
+    marginBottom: 12,
     borderWidth: 1,
     borderColor: colors.border,
     gap: 12,
   },
-  actionIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: colors.highlight,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  actionContent: {
-    flex: 1,
-  },
-  actionTitle: {
+  actionButtonText: {
     fontSize: 16,
-    fontWeight: '600',
     color: colors.text,
-    marginBottom: 2,
-  },
-  actionDescription: {
-    fontSize: 14,
-    color: colors.textSecondary,
-  },
-  securityCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#E8F5E9',
-    borderRadius: 12,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: '#81C784',
-    gap: 12,
-  },
-  securityContent: {
+    fontWeight: '500',
     flex: 1,
-  },
-  securityTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: colors.text,
-    marginBottom: 4,
-  },
-  securityText: {
-    fontSize: 14,
-    color: colors.textSecondary,
-    lineHeight: 20,
   },
   signOutButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
+    borderColor: '#FF3B30',
     backgroundColor: '#FFE5E5',
-    borderRadius: 12,
-    padding: 16,
-    marginTop: 12,
-    gap: 8,
-    borderWidth: 1,
-    borderColor: '#FFCDD2',
   },
   signOutButtonText: {
     color: '#FF3B30',
-    fontSize: 16,
-    fontWeight: '600',
   },
 });

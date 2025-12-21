@@ -31,8 +31,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const fetchUserProfile = async (userId: string) => {
+  const fetchUserProfile = async (userId: string, retryCount = 0): Promise<UserProfile | null> => {
     try {
+      console.log(`Fetching user profile for ${userId} (attempt ${retryCount + 1})`);
+      
       const { data, error } = await supabase
         .from('user_profiles')
         .select('*')
@@ -41,9 +43,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       if (error) {
         console.error('Error fetching user profile:', error);
+        
+        // If we get a recursion error and haven't retried too many times, wait and retry
+        if (error.message?.includes('infinite recursion') && retryCount < 3) {
+          console.log('Recursion detected, retrying after delay...');
+          await new Promise(resolve => setTimeout(resolve, 1000 * (retryCount + 1)));
+          return fetchUserProfile(userId, retryCount + 1);
+        }
+        
         return null;
       }
 
+      console.log('User profile fetched successfully:', data?.email, 'Role:', data?.role);
       return data as UserProfile;
     } catch (error) {
       console.error('Error fetching user profile:', error);
@@ -53,8 +64,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const refreshProfile = async () => {
     if (user) {
+      console.log('Refreshing profile for user:', user.email);
       const userProfile = await fetchUserProfile(user.id);
       setProfile(userProfile);
+      
+      // Also refresh the session to get updated JWT with role
+      const { data: { session: refreshedSession } } = await supabase.auth.refreshSession();
+      if (refreshedSession) {
+        console.log('Session refreshed with updated metadata');
+        setSession(refreshedSession);
+      }
     }
   };
 
@@ -67,6 +86,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         
         if (currentSession) {
           console.log('Session found:', currentSession.user.email);
+          console.log('User metadata:', currentSession.user.app_metadata);
           setSession(currentSession);
           setUser(currentSession.user);
           
@@ -89,6 +109,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         console.log('Auth state changed:', event);
         
         if (currentSession) {
+          console.log('New session for:', currentSession.user.email);
+          console.log('User metadata:', currentSession.user.app_metadata);
           setSession(currentSession);
           setUser(currentSession.user);
           
@@ -122,6 +144,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
 
       if (data.user) {
+        console.log('User signed in:', data.user.email);
+        console.log('User metadata:', data.user.app_metadata);
         const userProfile = await fetchUserProfile(data.user.id);
         setProfile(userProfile);
       }
@@ -144,7 +168,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const isAdmin = profile?.role === 'admin';
+  // Check admin status from both profile and JWT metadata
+  const isAdmin = React.useMemo(() => {
+    // First check the profile
+    if (profile?.role === 'admin') {
+      console.log('User is admin (from profile)');
+      return true;
+    }
+    
+    // Also check JWT metadata as a fallback
+    if (session?.user) {
+      const jwtRole = session.user.app_metadata?.role || session.user.user_metadata?.role;
+      if (jwtRole === 'admin') {
+        console.log('User is admin (from JWT metadata)');
+        return true;
+      }
+    }
+    
+    return false;
+  }, [profile, session]);
 
   return (
     <AuthContext.Provider

@@ -83,6 +83,7 @@ export default function AdminScreen() {
 
     setCreating(true);
     try {
+      // Create the user with role in user_metadata (will be moved to app_metadata by trigger)
       const { data, error } = await supabase.auth.signUp({
         email: newUserEmail,
         password: newUserPassword,
@@ -99,6 +100,24 @@ export default function AdminScreen() {
         console.error('Error creating user:', error);
         Alert.alert('Error', error.message || 'Failed to create user');
         return;
+      }
+
+      if (data.user) {
+        // Create the user profile with the role
+        const { error: profileError } = await supabase
+          .from('user_profiles')
+          .insert({
+            id: data.user.id,
+            email: newUserEmail,
+            full_name: newUserFullName,
+            role: newUserRole,
+          });
+
+        if (profileError) {
+          console.error('Error creating user profile:', profileError);
+          // Don't show error to user as the auth user was created successfully
+          console.log('User created but profile creation failed - will be created on first login');
+        }
       }
 
       Alert.alert(
@@ -182,6 +201,7 @@ export default function AdminScreen() {
           text: 'Change',
           onPress: async () => {
             try {
+              // Update the role in user_profiles (trigger will sync to JWT)
               const { error } = await supabase
                 .from('user_profiles')
                 .update({ role: newRole, updated_at: new Date().toISOString() })
@@ -193,7 +213,10 @@ export default function AdminScreen() {
                 return;
               }
 
-              Alert.alert('Success', 'Role updated successfully');
+              Alert.alert(
+                'Success', 
+                'Role updated successfully. The user will need to log out and log back in for the changes to take effect.'
+              );
               loadUsers();
             } catch (error) {
               console.error('Error updating role:', error);
