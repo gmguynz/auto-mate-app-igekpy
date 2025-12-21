@@ -134,6 +134,7 @@ export default function CustomerDetailScreen() {
   };
 
   const handleTransferVehicle = (vehicleIndex: number) => {
+    console.log('Transfer vehicle button clicked for index:', vehicleIndex);
     setTransferVehicleIndex(vehicleIndex);
     setShowTransferModal(true);
     setSelectedNewOwner(null);
@@ -492,7 +493,10 @@ export default function CustomerDetailScreen() {
                     <Text style={styles.vehicleTitle}>Vehicle {index + 1}</Text>
                     <View style={styles.vehicleActions}>
                       <TouchableOpacity 
-                        onPress={() => handleTransferVehicle(index)}
+                        onPress={() => {
+                          console.log('Transfer button pressed for vehicle index:', index);
+                          handleTransferVehicle(index);
+                        }}
                         style={styles.transferButton}
                         activeOpacity={0.7}
                       >
@@ -1167,5 +1171,10 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     userSelect: Platform.OS === 'web' ? 'none' : undefined,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: colors.text,
   },
 });

@@ -2,13 +2,58 @@
 import { supabase, isSupabaseConfigured } from '@/integrations/supabase/client';
 import { Customer } from '@/types/customer';
 
+// Retry configuration
+const MAX_RETRIES = 3;
+const RETRY_DELAY = 1000; // 1 second
+const TIMEOUT = 10000; // 10 seconds
+
+// Helper function to implement retry logic with exponential backoff
+async function retryOperation<T>(
+  operation: () => Promise<T>,
+  operationName: string,
+  retries = MAX_RETRIES
+): Promise<T> {
+  for (let attempt = 1; attempt <= retries; attempt++) {
+    try {
+      console.log(`${operationName} - Attempt ${attempt}/${retries}`);
+      const startTime = Date.now();
+      
+      // Create a timeout promise
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        setTimeout(() => reject(new Error('Operation timeout')), TIMEOUT);
+      });
+      
+      // Race between operation and timeout
+      const result = await Promise.race([operation(), timeoutPromise]);
+      
+      const duration = Date.now() - startTime;
+      console.log(`${operationName} completed in ${duration}ms`);
+      
+      return result;
+    } catch (error) {
+      console.error(`${operationName} failed (attempt ${attempt}/${retries}):`, error);
+      
+      if (attempt === retries) {
+        throw error;
+      }
+      
+      // Exponential backoff
+      const delay = RETRY_DELAY * Math.pow(2, attempt - 1);
+      console.log(`Retrying in ${delay}ms...`);
+      await new Promise(resolve => setTimeout(resolve, delay));
+    }
+  }
+  
+  throw new Error(`${operationName} failed after ${retries} attempts`);
+}
+
 export const supabaseStorage = {
   // Check if Supabase is properly configured
   isConfigured(): boolean {
     return isSupabaseConfigured();
   },
 
-  // Customer operations
+  // Customer operations with retry logic
   async getCustomers(): Promise<Customer[]> {
     try {
       if (!this.isConfigured()) {
@@ -16,30 +61,32 @@ export const supabaseStorage = {
         return [];
       }
 
-      const { data, error } = await supabase
-        .from('customers')
-        .select('*')
-        .order('created_at', { ascending: false });
+      return await retryOperation(async () => {
+        const { data, error } = await supabase
+          .from('customers')
+          .select('*')
+          .order('created_at', { ascending: false });
 
-      if (error) {
-        console.error('Error getting customers from Supabase:', error);
-        return [];
-      }
+        if (error) {
+          console.error('Error getting customers from Supabase:', error);
+          throw error;
+        }
 
-      // Transform Supabase data to match our Customer type
-      return (data || []).map((item: any) => ({
-        id: item.id,
-        firstName: item.first_name || '',
-        lastName: item.last_name || '',
-        companyName: item.company_name || '',
-        address: item.address || '',
-        email: item.email || '',
-        phone: item.phone || '',
-        mobile: item.mobile || '',
-        vehicles: item.vehicles || [],
-        createdAt: item.created_at,
-        updatedAt: item.updated_at,
-      }));
+        // Transform Supabase data to match our Customer type
+        return (data || []).map((item: any) => ({
+          id: item.id,
+          firstName: item.first_name || '',
+          lastName: item.last_name || '',
+          companyName: item.company_name || '',
+          address: item.address || '',
+          email: item.email || '',
+          phone: item.phone || '',
+          mobile: item.mobile || '',
+          vehicles: item.vehicles || [],
+          createdAt: item.created_at,
+          updatedAt: item.updated_at,
+        }));
+      }, 'getCustomers');
     } catch (error) {
       console.error('Error getting customers:', error);
       return [];
@@ -47,11 +94,11 @@ export const supabaseStorage = {
   },
 
   async addCustomer(customer: Customer): Promise<void> {
-    try {
-      if (!this.isConfigured()) {
-        throw new Error('Supabase not configured');
-      }
+    if (!this.isConfigured()) {
+      throw new Error('Supabase not configured');
+    }
 
+    await retryOperation(async () => {
       // Transform Customer type to Supabase schema
       const { error } = await supabase.from('customers').insert({
         id: customer.id,
@@ -73,18 +120,15 @@ export const supabaseStorage = {
       }
       
       console.log('Customer added successfully to Supabase');
-    } catch (error) {
-      console.error('Error adding customer:', error);
-      throw error;
-    }
+    }, 'addCustomer');
   },
 
   async updateCustomer(updatedCustomer: Customer): Promise<void> {
-    try {
-      if (!this.isConfigured()) {
-        throw new Error('Supabase not configured');
-      }
+    if (!this.isConfigured()) {
+      throw new Error('Supabase not configured');
+    }
 
+    await retryOperation(async () => {
       const { error } = await supabase
         .from('customers')
         .update({
@@ -106,18 +150,15 @@ export const supabaseStorage = {
       }
       
       console.log('Customer updated successfully in Supabase');
-    } catch (error) {
-      console.error('Error updating customer:', error);
-      throw error;
-    }
+    }, 'updateCustomer');
   },
 
   async deleteCustomer(customerId: string): Promise<void> {
-    try {
-      if (!this.isConfigured()) {
-        throw new Error('Supabase not configured');
-      }
+    if (!this.isConfigured()) {
+      throw new Error('Supabase not configured');
+    }
 
+    await retryOperation(async () => {
       const { error } = await supabase
         .from('customers')
         .delete()
@@ -129,10 +170,7 @@ export const supabaseStorage = {
       }
       
       console.log('Customer deleted successfully from Supabase');
-    } catch (error) {
-      console.error('Error deleting customer:', error);
-      throw error;
-    }
+    }, 'deleteCustomer');
   },
 
   async getCustomerById(customerId: string): Promise<Customer | null> {
@@ -142,33 +180,35 @@ export const supabaseStorage = {
         return null;
       }
 
-      const { data, error } = await supabase
-        .from('customers')
-        .select('*')
-        .eq('id', customerId)
-        .single();
+      return await retryOperation(async () => {
+        const { data, error } = await supabase
+          .from('customers')
+          .select('*')
+          .eq('id', customerId)
+          .single();
 
-      if (error) {
-        console.error('Error getting customer by id from Supabase:', error);
-        return null;
-      }
+        if (error) {
+          console.error('Error getting customer by id from Supabase:', error);
+          throw error;
+        }
 
-      if (!data) return null;
+        if (!data) return null;
 
-      // Transform Supabase data to match our Customer type
-      return {
-        id: data.id,
-        firstName: data.first_name || '',
-        lastName: data.last_name || '',
-        companyName: data.company_name || '',
-        address: data.address || '',
-        email: data.email || '',
-        phone: data.phone || '',
-        mobile: data.mobile || '',
-        vehicles: data.vehicles || [],
-        createdAt: data.created_at,
-        updatedAt: data.updated_at,
-      };
+        // Transform Supabase data to match our Customer type
+        return {
+          id: data.id,
+          firstName: data.first_name || '',
+          lastName: data.last_name || '',
+          companyName: data.company_name || '',
+          address: data.address || '',
+          email: data.email || '',
+          phone: data.phone || '',
+          mobile: data.mobile || '',
+          vehicles: data.vehicles || [],
+          createdAt: data.created_at,
+          updatedAt: data.updated_at,
+        };
+      }, 'getCustomerById');
     } catch (error) {
       console.error('Error getting customer by id:', error);
       return null;

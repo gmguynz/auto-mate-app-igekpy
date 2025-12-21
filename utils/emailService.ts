@@ -9,9 +9,13 @@ export interface EmailData {
   customerName: string;
 }
 
+// Retry configuration for email sending
+const MAX_EMAIL_RETRIES = 2;
+const EMAIL_RETRY_DELAY = 2000; // 2 seconds
+
 export const emailService = {
   /**
-   * Send an email using Supabase Edge Function
+   * Send an email using Supabase Edge Function with retry logic
    */
   async sendEmail(emailData: EmailData): Promise<{ success: boolean; error?: string }> {
     try {
@@ -30,75 +34,120 @@ export const emailService = {
       // Convert plain text body to HTML with line breaks
       const htmlBody = emailData.body.replace(/\n/g, '<br>');
 
-      // Call the Supabase Edge Function with correct parameters
-      const { data, error } = await supabase.functions.invoke('send-reminder-email', {
-        body: {
-          to: emailData.to,
-          subject: emailData.subject,
-          html: htmlBody,
-          customerName: emailData.customerName,
-        },
-      });
+      // Retry logic for email sending
+      for (let attempt = 1; attempt <= MAX_EMAIL_RETRIES; attempt++) {
+        try {
+          console.log(`Email send attempt ${attempt}/${MAX_EMAIL_RETRIES}`);
+          
+          // Call the Supabase Edge Function with correct parameters
+          const { data, error } = await supabase.functions.invoke('send-reminder-email', {
+            body: {
+              to: emailData.to,
+              subject: emailData.subject,
+              html: htmlBody,
+              customerName: emailData.customerName,
+            },
+          });
 
-      if (error) {
-        console.error('Error invoking Edge Function:', error);
-        console.error('Error details:', JSON.stringify(error, null, 2));
-        
-        // Provide more specific error messages
-        let errorMessage = 'Failed to send email';
-        if (error.message) {
-          errorMessage = error.message;
+          if (error) {
+            console.error('Error invoking Edge Function:', error);
+            console.error('Error details:', JSON.stringify(error, null, 2));
+            
+            // If this is not the last attempt, retry
+            if (attempt < MAX_EMAIL_RETRIES) {
+              console.log(`Retrying in ${EMAIL_RETRY_DELAY}ms...`);
+              await new Promise(resolve => setTimeout(resolve, EMAIL_RETRY_DELAY));
+              continue;
+            }
+            
+            // Provide more specific error messages
+            let errorMessage = 'Failed to send email';
+            if (error.message) {
+              errorMessage = error.message;
+            }
+            
+            // Check for common configuration issues
+            if (error.message?.includes('not configured') || error.message?.includes('RESEND_API_KEY')) {
+              errorMessage = 'Email service not configured. Please add RESEND_API_KEY to Supabase Edge Function secrets.';
+            } else if (error.message?.includes('domain') || error.message?.includes('verification')) {
+              errorMessage = 'Email domain not verified. Please verify your domain in Resend dashboard.';
+            } else if (error.message?.includes('FROM_EMAIL')) {
+              errorMessage = 'FROM_EMAIL not configured. Please add FROM_EMAIL to Supabase Edge Function secrets.';
+            }
+            
+            return {
+              success: false,
+              error: errorMessage,
+            };
+          }
+
+          // Check if the response contains an error object
+          if (data && data.error) {
+            console.error('Resend API error:', data.error);
+            console.error('Full error response:', JSON.stringify(data, null, 2));
+            
+            // If this is not the last attempt, retry
+            if (attempt < MAX_EMAIL_RETRIES) {
+              console.log(`Retrying in ${EMAIL_RETRY_DELAY}ms...`);
+              await new Promise(resolve => setTimeout(resolve, EMAIL_RETRY_DELAY));
+              continue;
+            }
+            
+            let errorMessage = 'Email service error';
+            if (data.error.message) {
+              errorMessage = data.error.message;
+            }
+            
+            // Check for specific Resend errors
+            if (data.error.message?.includes('domain')) {
+              errorMessage = 'Email domain not verified. Please verify your domain in Resend dashboard.';
+            } else if (data.error.message?.includes('API key')) {
+              errorMessage = 'Invalid Resend API key. Please check your RESEND_API_KEY in Supabase secrets.';
+            }
+            
+            return {
+              success: false,
+              error: errorMessage,
+            };
+          }
+
+          // Check if we got an ID back from Resend (indicates success)
+          if (data && data.id) {
+            console.log('Email sent successfully. Resend ID:', data.id);
+            return { success: true };
+          }
+
+          // If we got here and it's not the last attempt, retry
+          if (attempt < MAX_EMAIL_RETRIES) {
+            console.warn('Unexpected response from email service, retrying...');
+            await new Promise(resolve => setTimeout(resolve, EMAIL_RETRY_DELAY));
+            continue;
+          }
+
+          // If we got here, something unexpected happened
+          console.warn('Unexpected response from email service:', JSON.stringify(data, null, 2));
+          return {
+            success: false,
+            error: 'Unexpected response from email service. Please check the Edge Function logs in Supabase dashboard.',
+          };
+        } catch (attemptError) {
+          console.error(`Email send attempt ${attempt} exception:`, attemptError);
+          
+          // If this is not the last attempt, retry
+          if (attempt < MAX_EMAIL_RETRIES) {
+            console.log(`Retrying in ${EMAIL_RETRY_DELAY}ms...`);
+            await new Promise(resolve => setTimeout(resolve, EMAIL_RETRY_DELAY));
+            continue;
+          }
+          
+          throw attemptError;
         }
-        
-        // Check for common configuration issues
-        if (error.message?.includes('not configured') || error.message?.includes('RESEND_API_KEY')) {
-          errorMessage = 'Email service not configured. Please add RESEND_API_KEY to Supabase Edge Function secrets.';
-        } else if (error.message?.includes('domain') || error.message?.includes('verification')) {
-          errorMessage = 'Email domain not verified. Please verify your domain in Resend dashboard.';
-        } else if (error.message?.includes('FROM_EMAIL')) {
-          errorMessage = 'FROM_EMAIL not configured. Please add FROM_EMAIL to Supabase Edge Function secrets.';
-        }
-        
-        return {
-          success: false,
-          error: errorMessage,
-        };
       }
 
-      // Check if the response contains an error object
-      if (data && data.error) {
-        console.error('Resend API error:', data.error);
-        console.error('Full error response:', JSON.stringify(data, null, 2));
-        
-        let errorMessage = 'Email service error';
-        if (data.error.message) {
-          errorMessage = data.error.message;
-        }
-        
-        // Check for specific Resend errors
-        if (data.error.message?.includes('domain')) {
-          errorMessage = 'Email domain not verified. Please verify your domain in Resend dashboard.';
-        } else if (data.error.message?.includes('API key')) {
-          errorMessage = 'Invalid Resend API key. Please check your RESEND_API_KEY in Supabase secrets.';
-        }
-        
-        return {
-          success: false,
-          error: errorMessage,
-        };
-      }
-
-      // Check if we got an ID back from Resend (indicates success)
-      if (data && data.id) {
-        console.log('Email sent successfully. Resend ID:', data.id);
-        return { success: true };
-      }
-
-      // If we got here, something unexpected happened
-      console.warn('Unexpected response from email service:', JSON.stringify(data, null, 2));
+      // Should never reach here, but just in case
       return {
         success: false,
-        error: 'Unexpected response from email service. Please check the Edge Function logs in Supabase dashboard.',
+        error: 'Failed to send email after multiple attempts',
       };
     } catch (error) {
       console.error('Exception sending email:', error);

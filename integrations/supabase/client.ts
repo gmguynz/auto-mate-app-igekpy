@@ -44,7 +44,7 @@ let supabaseClient: ReturnType<typeof createClient> | null = null;
 
 try {
   if (isSupabaseConfigured()) {
-    console.log('Initializing Supabase client with auth...');
+    console.log('Initializing Supabase client with optimized settings...');
     supabaseClient = createClient(supabaseUrl, supabaseAnonKey, {
       auth: {
         storage: AsyncStorage,
@@ -52,8 +52,21 @@ try {
         persistSession: true,
         detectSessionInUrl: false,
       },
+      global: {
+        headers: {
+          'x-client-info': 'supabase-js-react-native',
+        },
+      },
+      db: {
+        schema: 'public',
+      },
+      realtime: {
+        params: {
+          eventsPerSecond: 10,
+        },
+      },
     });
-    console.log('Supabase client initialized successfully');
+    console.log('Supabase client initialized successfully with connection pooling');
   } else {
     console.log('Supabase not configured, using placeholder client');
     supabaseClient = createPlaceholderClient();
@@ -64,3 +77,27 @@ try {
 }
 
 export const supabase = supabaseClient || createPlaceholderClient();
+
+// Connection health check utility
+export const checkSupabaseConnection = async (): Promise<{ healthy: boolean; latency?: number; error?: string }> => {
+  if (!isSupabaseConfigured()) {
+    return { healthy: false, error: 'Supabase not configured' };
+  }
+
+  try {
+    const startTime = Date.now();
+    const { error } = await supabase.from('customers').select('count', { count: 'exact', head: true });
+    const latency = Date.now() - startTime;
+
+    if (error) {
+      console.error('Connection health check failed:', error);
+      return { healthy: false, latency, error: error.message };
+    }
+
+    console.log(`Connection healthy - latency: ${latency}ms`);
+    return { healthy: true, latency };
+  } catch (error) {
+    console.error('Connection health check exception:', error);
+    return { healthy: false, error: error instanceof Error ? error.message : 'Unknown error' };
+  }
+};
