@@ -33,12 +33,15 @@ export default function AdminScreen() {
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editingUser, setEditingUser] = useState<UserProfile | null>(null);
   const [newUserEmail, setNewUserEmail] = useState('');
   const [newUserPassword, setNewUserPassword] = useState('');
   const [newUserFullName, setNewUserFullName] = useState('');
   const [newUserId, setNewUserId] = useState('');
   const [newUserRole, setNewUserRole] = useState<'admin' | 'user'>('user');
   const [creating, setCreating] = useState(false);
+  const [updating, setUpdating] = useState(false);
 
   useEffect(() => {
     if (!isAdmin) {
@@ -149,6 +152,70 @@ export default function AdminScreen() {
       Alert.alert('Error', 'Failed to create user');
     } finally {
       setCreating(false);
+    }
+  };
+
+  const handleEditUser = (user: UserProfile) => {
+    setEditingUser(user);
+    setNewUserFullName(user.full_name || '');
+    setNewUserId(user.user_id || '');
+    setNewUserRole(user.role);
+    setShowEditModal(true);
+  };
+
+  const handleUpdateUser = async () => {
+    if (!editingUser) return;
+
+    if (!newUserFullName) {
+      Alert.alert('Error', 'Full name is required');
+      return;
+    }
+
+    if (newUserId && newUserId.length < 3) {
+      Alert.alert('Error', 'User ID must be at least 3 characters');
+      return;
+    }
+
+    setUpdating(true);
+    try {
+      const { error } = await supabase
+        .from('user_profiles')
+        .update({
+          full_name: newUserFullName,
+          user_id: newUserId || null,
+          role: newUserRole,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', editingUser.id);
+
+      if (error) {
+        console.error('Error updating user:', error);
+        Alert.alert('Error', error.message || 'Failed to update user');
+        return;
+      }
+
+      Alert.alert(
+        'Success',
+        'User updated successfully. The user will need to log out and log back in for role changes to take effect.',
+        [
+          {
+            text: 'OK',
+            onPress: () => {
+              setShowEditModal(false);
+              setEditingUser(null);
+              setNewUserFullName('');
+              setNewUserId('');
+              setNewUserRole('user');
+              loadUsers();
+            },
+          },
+        ]
+      );
+    } catch (error) {
+      console.error('Error updating user:', error);
+      Alert.alert('Error', 'Failed to update user');
+    } finally {
+      setUpdating(false);
     }
   };
 
@@ -366,6 +433,17 @@ export default function AdminScreen() {
                 <View style={styles.userActions}>
                   <TouchableOpacity
                     style={styles.actionButton}
+                    onPress={() => handleEditUser(user)}
+                  >
+                    <IconSymbol
+                      ios_icon_name="pencil"
+                      android_material_icon_name="edit"
+                      size={20}
+                      color={colors.primary}
+                    />
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.actionButton}
                     onPress={() => handleSendPasswordReset(user.email)}
                   >
                     <IconSymbol
@@ -408,6 +486,7 @@ export default function AdminScreen() {
         </View>
       </ScrollView>
 
+      {/* Create User Modal */}
       <Modal
         visible={showCreateModal}
         animationType="slide"
@@ -533,6 +612,126 @@ export default function AdminScreen() {
                   <ActivityIndicator color="#FFFFFF" />
                 ) : (
                   <Text style={styles.submitButtonText}>Create User</Text>
+                )}
+              </TouchableOpacity>
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Edit User Modal */}
+      <Modal
+        visible={showEditModal}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setShowEditModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Edit User</Text>
+              <TouchableOpacity onPress={() => setShowEditModal(false)}>
+                <IconSymbol
+                  ios_icon_name="xmark.circle.fill"
+                  android_material_icon_name="close"
+                  size={28}
+                  color={colors.textSecondary}
+                />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView style={styles.modalScroll}>
+              <View style={styles.inputContainer}>
+                <Text style={styles.label}>Email (read-only)</Text>
+                <TextInput
+                  style={[styles.input, styles.inputDisabled]}
+                  value={editingUser?.email}
+                  editable={false}
+                />
+              </View>
+
+              <View style={styles.inputContainer}>
+                <Text style={styles.label}>Full Name *</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="Enter full name"
+                  placeholderTextColor={colors.textSecondary}
+                  value={newUserFullName}
+                  onChangeText={setNewUserFullName}
+                  editable={!updating}
+                />
+              </View>
+
+              <View style={styles.inputContainer}>
+                <Text style={styles.label}>User ID (optional)</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="Enter custom user ID for login"
+                  placeholderTextColor={colors.textSecondary}
+                  value={newUserId}
+                  onChangeText={setNewUserId}
+                  autoCapitalize="none"
+                  editable={!updating}
+                />
+                <Text style={styles.helperText}>
+                  User can log in with either email or this custom ID
+                </Text>
+              </View>
+
+              <View style={styles.inputContainer}>
+                <Text style={styles.label}>Role *</Text>
+                <View style={styles.roleSelector}>
+                  <TouchableOpacity
+                    style={[
+                      styles.roleOption,
+                      newUserRole === 'user' && styles.roleOptionSelected,
+                    ]}
+                    onPress={() => setNewUserRole('user')}
+                    disabled={updating || editingUser?.id === profile?.id}
+                  >
+                    <Text
+                      style={[
+                        styles.roleOptionText,
+                        newUserRole === 'user' && styles.roleOptionTextSelected,
+                      ]}
+                    >
+                      User
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[
+                      styles.roleOption,
+                      newUserRole === 'admin' && styles.roleOptionSelected,
+                    ]}
+                    onPress={() => setNewUserRole('admin')}
+                    disabled={updating || editingUser?.id === profile?.id}
+                  >
+                    <Text
+                      style={[
+                        styles.roleOptionText,
+                        newUserRole === 'admin' && styles.roleOptionTextSelected,
+                      ]}
+                    >
+                      Admin
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+                {editingUser?.id === profile?.id && (
+                  <Text style={styles.helperText}>
+                    You cannot change your own role
+                  </Text>
+                )}
+              </View>
+
+              <TouchableOpacity
+                style={[styles.submitButton, updating && styles.submitButtonDisabled]}
+                onPress={handleUpdateUser}
+                disabled={updating}
+              >
+                {updating ? (
+                  <ActivityIndicator color="#FFFFFF" />
+                ) : (
+                  <Text style={styles.submitButtonText}>Update User</Text>
                 )}
               </TouchableOpacity>
             </ScrollView>
@@ -746,6 +945,10 @@ const styles = StyleSheet.create({
     padding: 16,
     fontSize: 16,
     color: colors.text,
+  },
+  inputDisabled: {
+    opacity: 0.6,
+    backgroundColor: colors.highlight,
   },
   helperText: {
     fontSize: 12,

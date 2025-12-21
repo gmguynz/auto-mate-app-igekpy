@@ -22,7 +22,6 @@ export default function ProfileScreen() {
   const router = useRouter();
   const [refreshing, setRefreshing] = useState(false);
   const [showPasswordModal, setShowPasswordModal] = useState(false);
-  const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [changingPassword, setChangingPassword] = useState(false);
@@ -58,6 +57,7 @@ export default function ProfileScreen() {
     const metadata = {
       'User ID': user?.id,
       'Email': user?.email,
+      'Custom User ID': profile?.user_id || 'Not set',
       'Profile Role': profile?.role,
       'JWT Role (app_metadata)': session?.user?.app_metadata?.role,
       'JWT Role (user_metadata)': session?.user?.user_metadata?.role,
@@ -100,9 +100,8 @@ export default function ProfileScreen() {
         Alert.alert('Error', error.message || 'Failed to update password');
       } else {
         console.log('Password updated successfully');
-        Alert.alert('Success', 'Password updated successfully');
+        Alert.alert('Success', 'Password updated successfully. You can now use your new password to log in.');
         setShowPasswordModal(false);
-        setCurrentPassword('');
         setNewPassword('');
         setConfirmPassword('');
       }
@@ -175,6 +174,9 @@ export default function ProfileScreen() {
           </View>
           <Text style={styles.name}>{profile?.full_name || 'No name'}</Text>
           <Text style={styles.email}>{user?.email}</Text>
+          {profile?.user_id && (
+            <Text style={styles.userId}>User ID: {profile.user_id}</Text>
+          )}
           <View style={styles.roleBadge}>
             <Text style={[styles.roleText, isAdmin && styles.roleTextAdmin]}>
               {isAdmin ? 'ADMIN' : 'USER'}
@@ -196,6 +198,12 @@ export default function ProfileScreen() {
               <Text style={styles.infoLabel}>Email</Text>
               <Text style={styles.infoValue}>{user?.email}</Text>
             </View>
+            {profile?.user_id && (
+              <View style={styles.infoRow}>
+                <Text style={styles.infoLabel}>Custom User ID</Text>
+                <Text style={styles.infoValue}>{profile.user_id}</Text>
+              </View>
+            )}
             <View style={styles.infoRow}>
               <Text style={styles.infoLabel}>Full Name</Text>
               <Text style={styles.infoValue}>{profile?.full_name || 'Not set'}</Text>
@@ -319,6 +327,10 @@ export default function ProfileScreen() {
             </View>
 
             <View style={styles.modalBody}>
+              <Text style={styles.infoText}>
+                You are currently logged in, so you can change your password directly without needing to enter your current password.
+              </Text>
+
               <Text style={styles.inputLabel}>New Password</Text>
               <TextInput
                 style={styles.input}
@@ -403,6 +415,12 @@ const styles = StyleSheet.create({
   email: {
     fontSize: 16,
     color: colors.textSecondary,
+    marginBottom: 4,
+  },
+  userId: {
+    fontSize: 14,
+    color: colors.textSecondary,
+    fontStyle: 'italic',
     marginBottom: 12,
   },
   roleBadge: {
@@ -511,6 +529,12 @@ const styles = StyleSheet.create({
   },
   modalBody: {
     padding: 20,
+  },
+  infoText: {
+    fontSize: 14,
+    color: colors.textSecondary,
+    marginBottom: 20,
+    lineHeight: 20,
   },
   inputLabel: {
     fontSize: 14,
