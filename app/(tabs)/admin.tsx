@@ -21,6 +21,7 @@ interface UserProfile {
   id: string;
   email: string;
   full_name: string | null;
+  user_id: string | null;
   role: 'admin' | 'user';
   created_at: string;
   updated_at: string;
@@ -35,6 +36,7 @@ export default function AdminScreen() {
   const [newUserEmail, setNewUserEmail] = useState('');
   const [newUserPassword, setNewUserPassword] = useState('');
   const [newUserFullName, setNewUserFullName] = useState('');
+  const [newUserId, setNewUserId] = useState('');
   const [newUserRole, setNewUserRole] = useState<'admin' | 'user'>('user');
   const [creating, setCreating] = useState(false);
 
@@ -72,7 +74,7 @@ export default function AdminScreen() {
 
   const handleCreateUser = async () => {
     if (!newUserEmail || !newUserPassword || !newUserFullName) {
-      Alert.alert('Error', 'Please fill in all fields');
+      Alert.alert('Error', 'Please fill in all required fields');
       return;
     }
 
@@ -81,15 +83,20 @@ export default function AdminScreen() {
       return;
     }
 
+    if (newUserId && newUserId.length < 3) {
+      Alert.alert('Error', 'User ID must be at least 3 characters');
+      return;
+    }
+
     setCreating(true);
     try {
-      // Create the user with role in user_metadata (will be moved to app_metadata by trigger)
       const { data, error } = await supabase.auth.signUp({
         email: newUserEmail,
         password: newUserPassword,
         options: {
           data: {
             full_name: newUserFullName,
+            user_id: newUserId || null,
             role: newUserRole,
           },
           emailRedirectTo: 'https://natively.dev/email-confirmed',
@@ -103,26 +110,25 @@ export default function AdminScreen() {
       }
 
       if (data.user) {
-        // Create the user profile with the role
         const { error: profileError } = await supabase
           .from('user_profiles')
           .insert({
             id: data.user.id,
             email: newUserEmail,
             full_name: newUserFullName,
+            user_id: newUserId || null,
             role: newUserRole,
           });
 
         if (profileError) {
           console.error('Error creating user profile:', profileError);
-          // Don't show error to user as the auth user was created successfully
           console.log('User created but profile creation failed - will be created on first login');
         }
       }
 
       Alert.alert(
         'Success',
-        `User created successfully! An email verification link has been sent to ${newUserEmail}. The user must verify their email before they can log in.`,
+        `User created successfully! An email verification link has been sent to ${newUserEmail}. The user must verify their email before they can log in.${newUserId ? `\n\nUser ID: ${newUserId}` : ''}`,
         [
           {
             text: 'OK',
@@ -131,6 +137,7 @@ export default function AdminScreen() {
               setNewUserEmail('');
               setNewUserPassword('');
               setNewUserFullName('');
+              setNewUserId('');
               setNewUserRole('user');
               loadUsers();
             },
@@ -143,6 +150,44 @@ export default function AdminScreen() {
     } finally {
       setCreating(false);
     }
+  };
+
+  const handleSendPasswordReset = async (userEmail: string) => {
+    Alert.alert(
+      'Send Password Reset',
+      `Send a password reset email to ${userEmail}?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Send',
+          onPress: async () => {
+            try {
+              console.log('Sending password reset email to:', userEmail);
+              const { data, error } = await supabase.auth.resetPasswordForEmail(
+                userEmail,
+                {
+                  redirectTo: 'https://natively.dev/email-confirmed',
+                }
+              );
+
+              if (error) {
+                console.error('Password reset email error:', error);
+                Alert.alert('Error', error.message || 'Failed to send reset email');
+              } else {
+                console.log('Password reset email sent successfully');
+                Alert.alert(
+                  'Email Sent',
+                  `A password reset link has been sent to ${userEmail}. The user should check their inbox and spam folder.`
+                );
+              }
+            } catch (error) {
+              console.error('Password reset email error:', error);
+              Alert.alert('Error', 'Failed to send reset email');
+            }
+          },
+        },
+      ]
+    );
   };
 
   const handleDeleteUser = async (userId: string, userEmail: string) => {
@@ -201,7 +246,6 @@ export default function AdminScreen() {
           text: 'Change',
           onPress: async () => {
             try {
-              // Update the role in user_profiles (trigger will sync to JWT)
               const { error } = await supabase
                 .from('user_profiles')
                 .update({ role: newRole, updated_at: new Date().toISOString() })
@@ -304,6 +348,9 @@ export default function AdminScreen() {
                   <View style={styles.userDetails}>
                     <Text style={styles.userName}>{user.full_name || 'No name'}</Text>
                     <Text style={styles.userEmail}>{user.email}</Text>
+                    {user.user_id && (
+                      <Text style={styles.userIdText}>User ID: {user.user_id}</Text>
+                    )}
                     <View style={styles.roleBadge}>
                       <Text
                         style={[
@@ -316,32 +363,45 @@ export default function AdminScreen() {
                     </View>
                   </View>
                 </View>
-                {user.id !== profile?.id && (
-                  <View style={styles.userActions}>
-                    <TouchableOpacity
-                      style={styles.actionButton}
-                      onPress={() => handleToggleRole(user.id, user.role, user.email)}
-                    >
-                      <IconSymbol
-                        ios_icon_name="arrow.2.squarepath"
-                        android_material_icon_name="swap-horiz"
-                        size={20}
-                        color={colors.primary}
-                      />
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={[styles.actionButton, styles.deleteButton]}
-                      onPress={() => handleDeleteUser(user.id, user.email)}
-                    >
-                      <IconSymbol
-                        ios_icon_name="trash.fill"
-                        android_material_icon_name="delete"
-                        size={20}
-                        color="#FF3B30"
-                      />
-                    </TouchableOpacity>
-                  </View>
-                )}
+                <View style={styles.userActions}>
+                  <TouchableOpacity
+                    style={styles.actionButton}
+                    onPress={() => handleSendPasswordReset(user.email)}
+                  >
+                    <IconSymbol
+                      ios_icon_name="envelope.fill"
+                      android_material_icon_name="email"
+                      size={20}
+                      color={colors.primary}
+                    />
+                  </TouchableOpacity>
+                  {user.id !== profile?.id && (
+                    <>
+                      <TouchableOpacity
+                        style={styles.actionButton}
+                        onPress={() => handleToggleRole(user.id, user.role, user.email)}
+                      >
+                        <IconSymbol
+                          ios_icon_name="arrow.2.squarepath"
+                          android_material_icon_name="swap-horiz"
+                          size={20}
+                          color={colors.primary}
+                        />
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={[styles.actionButton, styles.deleteButton]}
+                        onPress={() => handleDeleteUser(user.id, user.email)}
+                      >
+                        <IconSymbol
+                          ios_icon_name="trash.fill"
+                          android_material_icon_name="delete"
+                          size={20}
+                          color="#FF3B30"
+                        />
+                      </TouchableOpacity>
+                    </>
+                  )}
+                </View>
               </View>
             </React.Fragment>
           ))}
@@ -370,7 +430,7 @@ export default function AdminScreen() {
 
             <ScrollView style={styles.modalScroll}>
               <View style={styles.inputContainer}>
-                <Text style={styles.label}>Full Name</Text>
+                <Text style={styles.label}>Full Name *</Text>
                 <TextInput
                   style={styles.input}
                   placeholder="Enter full name"
@@ -382,7 +442,7 @@ export default function AdminScreen() {
               </View>
 
               <View style={styles.inputContainer}>
-                <Text style={styles.label}>Email</Text>
+                <Text style={styles.label}>Email *</Text>
                 <TextInput
                   style={styles.input}
                   placeholder="Enter email address"
@@ -396,7 +456,23 @@ export default function AdminScreen() {
               </View>
 
               <View style={styles.inputContainer}>
-                <Text style={styles.label}>Password</Text>
+                <Text style={styles.label}>User ID (optional)</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="Enter custom user ID for login"
+                  placeholderTextColor={colors.textSecondary}
+                  value={newUserId}
+                  onChangeText={setNewUserId}
+                  autoCapitalize="none"
+                  editable={!creating}
+                />
+                <Text style={styles.helperText}>
+                  User can log in with either email or this custom ID
+                </Text>
+              </View>
+
+              <View style={styles.inputContainer}>
+                <Text style={styles.label}>Password *</Text>
                 <TextInput
                   style={styles.input}
                   placeholder="Enter password (min 6 characters)"
@@ -409,7 +485,7 @@ export default function AdminScreen() {
               </View>
 
               <View style={styles.inputContainer}>
-                <Text style={styles.label}>Role</Text>
+                <Text style={styles.label}>Role *</Text>
                 <View style={styles.roleSelector}>
                   <TouchableOpacity
                     style={[
@@ -588,6 +664,12 @@ const styles = StyleSheet.create({
   userEmail: {
     fontSize: 14,
     color: colors.textSecondary,
+    marginBottom: 2,
+  },
+  userIdText: {
+    fontSize: 12,
+    color: colors.textSecondary,
+    fontStyle: 'italic',
     marginBottom: 4,
   },
   roleBadge: {
@@ -664,6 +746,11 @@ const styles = StyleSheet.create({
     padding: 16,
     fontSize: 16,
     color: colors.text,
+  },
+  helperText: {
+    fontSize: 12,
+    color: colors.textSecondary,
+    marginTop: 4,
   },
   roleSelector: {
     flexDirection: 'row',

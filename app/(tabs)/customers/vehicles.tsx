@@ -47,7 +47,6 @@ export default function VehiclesScreen() {
       });
     });
 
-    // Sort by registration number
     allVehicles.sort((a, b) => a.registrationNumber.localeCompare(b.registrationNumber));
 
     setVehicles(allVehicles);
@@ -116,7 +115,7 @@ export default function VehiclesScreen() {
         />
         <TextInput
           style={styles.searchInput}
-          placeholder="Search by registration number..."
+          placeholder="Search by rego, make, or model..."
           placeholderTextColor={colors.textSecondary}
           value={searchQuery}
           onChangeText={setSearchQuery}

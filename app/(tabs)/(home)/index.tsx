@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, TextInput } from 'react-native';
 import { useRouter } from 'expo-router';
 import { colors } from '@/styles/commonStyles';
 import { IconSymbol } from '@/components/IconSymbol';
@@ -20,6 +20,8 @@ export default function HomeScreen() {
   const [reminderCount, setReminderCount] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [customers, setCustomers] = useState<Customer[]>([]);
 
   useEffect(() => {
     initializeScreen();
@@ -56,19 +58,20 @@ export default function HomeScreen() {
 
   const loadCounts = async () => {
     try {
-      const customers = await storageUtils.getCustomers();
-      setCustomerCount(customers.length);
+      const customersData = await storageUtils.getCustomers();
+      setCustomers(customersData);
+      setCustomerCount(customersData.length);
       
       let totalVehicles = 0;
-      customers.forEach((customer) => {
+      customersData.forEach((customer) => {
         totalVehicles += customer.vehicles.length;
       });
       setVehicleCount(totalVehicles);
 
-      const reminders = getUpcomingReminders(customers);
+      const reminders = getUpcomingReminders(customersData);
       setReminderCount(reminders);
       
-      console.log(`Loaded ${customers.length} customers, ${totalVehicles} vehicles, ${reminders} reminders`);
+      console.log(`Loaded ${customersData.length} customers, ${totalVehicles} vehicles, ${reminders} reminders`);
     } catch (err) {
       console.error('Error loading counts:', err);
       setCustomerCount(0);
@@ -131,6 +134,28 @@ export default function HomeScreen() {
     );
   };
 
+  const handleSearch = () => {
+    if (searchQuery.trim()) {
+      router.push(`/customers?search=${encodeURIComponent(searchQuery.trim())}`);
+    }
+  };
+
+  const getFilteredCustomers = () => {
+    if (!searchQuery.trim()) {
+      return [];
+    }
+    const query = searchQuery.toLowerCase();
+    return customers.filter(
+      (customer) =>
+        customer.firstName.toLowerCase().includes(query) ||
+        customer.lastName.toLowerCase().includes(query) ||
+        customer.companyName.toLowerCase().includes(query) ||
+        customer.vehicles.some((v) => v.registrationNumber.toLowerCase().includes(query))
+    );
+  };
+
+  const filteredCustomers = getFilteredCustomers();
+
   if (showSetupGuide) {
     return <SupabaseSetupGuide onDismiss={() => setShowSetupGuide(false)} />;
   }
@@ -188,6 +213,83 @@ export default function HomeScreen() {
             </View>
           )}
         </View>
+
+        <View style={styles.searchContainer}>
+          <IconSymbol
+            ios_icon_name="magnifyingglass"
+            android_material_icon_name="search"
+            size={20}
+            color={colors.textSecondary}
+            style={styles.searchIcon}
+          />
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Search by name, company, or rego..."
+            placeholderTextColor={colors.textSecondary}
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            onSubmitEditing={handleSearch}
+            returnKeyType="search"
+          />
+          {searchQuery.length > 0 && (
+            <TouchableOpacity onPress={() => setSearchQuery('')}>
+              <IconSymbol
+                ios_icon_name="xmark.circle.fill"
+                android_material_icon_name="cancel"
+                size={20}
+                color={colors.textSecondary}
+              />
+            </TouchableOpacity>
+          )}
+        </View>
+
+        {searchQuery.trim() && filteredCustomers.length > 0 && (
+          <View style={styles.searchResults}>
+            <Text style={styles.searchResultsTitle}>
+              {filteredCustomers.length} result{filteredCustomers.length !== 1 ? 's' : ''}
+            </Text>
+            {filteredCustomers.slice(0, 3).map((customer, index) => {
+              const displayName = customer.companyName || `${customer.firstName} ${customer.lastName}`;
+              return (
+                <React.Fragment key={index}>
+                  <TouchableOpacity
+                    style={styles.searchResultCard}
+                    onPress={() => {
+                      setSearchQuery('');
+                      router.push(`/customers/${customer.id}`);
+                    }}
+                  >
+                    <View style={styles.searchResultInfo}>
+                      <Text style={styles.searchResultName}>{displayName}</Text>
+                      <Text style={styles.searchResultDetail}>{customer.email}</Text>
+                      {customer.vehicles.length > 0 && (
+                        <Text style={styles.searchResultDetail}>
+                          {customer.vehicles.length} vehicle{customer.vehicles.length !== 1 ? 's' : ''}
+                        </Text>
+                      )}
+                    </View>
+                    <IconSymbol
+                      ios_icon_name="chevron.right"
+                      android_material_icon_name="chevron-right"
+                      size={20}
+                      color={colors.textSecondary}
+                    />
+                  </TouchableOpacity>
+                </React.Fragment>
+              );
+            })}
+            {filteredCustomers.length > 3 && (
+              <TouchableOpacity
+                style={styles.viewAllButton}
+                onPress={handleSearch}
+              >
+                <Text style={styles.viewAllButtonText}>
+                  View all {filteredCustomers.length} results
+                </Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        )}
 
         <View style={styles.actionsContainer}>
           <Text style={styles.actionsTitle}>Quick Actions</Text>
@@ -483,7 +585,7 @@ const styles = StyleSheet.create({
     paddingBottom: 100,
   },
   header: {
-    marginBottom: 24,
+    marginBottom: 16,
   },
   title: {
     fontSize: 32,
@@ -522,6 +624,70 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: '600',
     color: '#FFFFFF',
+  },
+  searchContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.card,
+    marginBottom: 16,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  searchIcon: {
+    marginRight: 8,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 16,
+    color: colors.text,
+  },
+  searchResults: {
+    backgroundColor: colors.card,
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  searchResultsTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.textSecondary,
+    marginBottom: 8,
+  },
+  searchResultCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 12,
+    backgroundColor: colors.background,
+    borderRadius: 8,
+    marginBottom: 8,
+  },
+  searchResultInfo: {
+    flex: 1,
+  },
+  searchResultName: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: colors.text,
+    marginBottom: 2,
+  },
+  searchResultDetail: {
+    fontSize: 13,
+    color: colors.textSecondary,
+  },
+  viewAllButton: {
+    padding: 12,
+    alignItems: 'center',
+  },
+  viewAllButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.primary,
   },
   actionsContainer: {
     marginBottom: 24,

@@ -31,6 +31,7 @@ export default function CustomerDetailScreen() {
     vehicleIndex: number;
     field: 'inspection' | 'service';
   }>({ show: false, vehicleIndex: -1, field: 'inspection' });
+  const [searchQuery, setSearchQuery] = useState('');
 
   useEffect(() => {
     loadCustomer();
@@ -67,7 +68,6 @@ export default function CustomerDetailScreen() {
 
     await storageUtils.updateCustomer(updated);
     
-    // Reschedule all notifications to reflect the updated customer data
     console.log('Rescheduling notifications after updating customer...');
     await notificationService.scheduleAllReminders();
     
@@ -146,6 +146,19 @@ export default function CustomerDetailScreen() {
     return `${cust.firstName} ${cust.lastName}`.trim();
   };
 
+  const getFilteredVehicles = () => {
+    if (!customer || !searchQuery.trim()) {
+      return customer?.vehicles || [];
+    }
+    const query = searchQuery.toLowerCase();
+    return customer.vehicles.filter(
+      (vehicle) =>
+        vehicle.registrationNumber.toLowerCase().includes(query) ||
+        vehicle.make.toLowerCase().includes(query) ||
+        vehicle.model.toLowerCase().includes(query)
+    );
+  };
+
   const renderDatePicker = () => {
     if (!showDatePicker.show || showDatePicker.vehicleIndex < 0 || !editedCustomer) {
       return null;
@@ -218,6 +231,9 @@ export default function CustomerDetailScreen() {
     );
   }
 
+  const filteredVehicles = getFilteredVehicles();
+  const displayVehicles = isEditing ? editedCustomer.vehicles : filteredVehicles;
+
   return (
     <View style={styles.container}>
       <View style={styles.header}>
@@ -243,6 +259,35 @@ export default function CustomerDetailScreen() {
           <View style={{ width: 40 }} />
         )}
       </View>
+
+      {!isEditing && customer.vehicles.length > 0 && (
+        <View style={styles.searchContainer}>
+          <IconSymbol
+            ios_icon_name="magnifyingglass"
+            android_material_icon_name="search"
+            size={20}
+            color={colors.textSecondary}
+            style={styles.searchIcon}
+          />
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Search vehicles..."
+            placeholderTextColor={colors.textSecondary}
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+          />
+          {searchQuery.length > 0 && (
+            <TouchableOpacity onPress={() => setSearchQuery('')}>
+              <IconSymbol
+                ios_icon_name="xmark.circle.fill"
+                android_material_icon_name="cancel"
+                size={20}
+                color={colors.textSecondary}
+              />
+            </TouchableOpacity>
+          )}
+        </View>
+      )}
 
       <ScrollView
         style={styles.scrollView}
@@ -339,7 +384,9 @@ export default function CustomerDetailScreen() {
 
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Vehicles</Text>
+            <Text style={styles.sectionTitle}>
+              Vehicles {!isEditing && searchQuery && `(${filteredVehicles.length})`}
+            </Text>
             {isEditing && (
               <TouchableOpacity onPress={addVehicle} style={styles.addButton}>
                 <IconSymbol
@@ -352,180 +399,178 @@ export default function CustomerDetailScreen() {
             )}
           </View>
 
-          {(isEditing ? editedCustomer.vehicles : customer.vehicles).map(
-            (vehicle, index) => (
-              <React.Fragment key={index}>
-                <View style={styles.vehicleCard}>
-                  {isEditing && (
-                    <View style={styles.vehicleHeader}>
-                      <Text style={styles.vehicleTitle}>Vehicle {index + 1}</Text>
-                      <TouchableOpacity onPress={() => removeVehicle(index)}>
-                        <IconSymbol
-                          ios_icon_name="trash"
-                          android_material_icon_name="delete"
-                          size={20}
-                          color={colors.error}
-                        />
-                      </TouchableOpacity>
-                    </View>
-                  )}
-
-                  <Text style={styles.label}>Registration Number</Text>
-                  {isEditing ? (
-                    <TextInput
-                      style={styles.input}
-                      value={vehicle.registrationNumber}
-                      onChangeText={(text) =>
-                        updateVehicle(index, 'registrationNumber', text)
-                      }
-                      autoCapitalize="characters"
-                    />
-                  ) : (
-                    <Text style={styles.value}>{vehicle.registrationNumber}</Text>
-                  )}
-
-                  <Text style={styles.label}>Make</Text>
-                  {isEditing ? (
-                    <TextInput
-                      style={styles.input}
-                      value={vehicle.make}
-                      onChangeText={(text) => updateVehicle(index, 'make', text)}
-                    />
-                  ) : (
-                    <Text style={styles.value}>{vehicle.make}</Text>
-                  )}
-
-                  <Text style={styles.label}>Model</Text>
-                  {isEditing ? (
-                    <TextInput
-                      style={styles.input}
-                      value={vehicle.model}
-                      onChangeText={(text) => updateVehicle(index, 'model', text)}
-                    />
-                  ) : (
-                    <Text style={styles.value}>{vehicle.model}</Text>
-                  )}
-
-                  <Text style={styles.label}>Year</Text>
-                  {isEditing ? (
-                    <TextInput
-                      style={styles.input}
-                      value={vehicle.year}
-                      onChangeText={(text) => updateVehicle(index, 'year', text)}
-                      keyboardType="numeric"
-                    />
-                  ) : (
-                    <Text style={styles.value}>{vehicle.year}</Text>
-                  )}
-
-                  <Text style={styles.label}>WOF Inspection Due Date</Text>
-                  {isEditing ? (
-                    <TouchableOpacity
-                      style={styles.dateButton}
-                      onPress={() =>
-                        setShowDatePicker({
-                          show: true,
-                          vehicleIndex: index,
-                          field: 'inspection',
-                        })
-                      }
-                    >
+          {displayVehicles.map((vehicle, index) => (
+            <React.Fragment key={index}>
+              <View style={styles.vehicleCard}>
+                {isEditing && (
+                  <View style={styles.vehicleHeader}>
+                    <Text style={styles.vehicleTitle}>Vehicle {index + 1}</Text>
+                    <TouchableOpacity onPress={() => removeVehicle(index)}>
                       <IconSymbol
-                        ios_icon_name="calendar"
-                        android_material_icon_name="calendar-today"
+                        ios_icon_name="trash"
+                        android_material_icon_name="delete"
                         size={20}
-                        color={colors.primary}
+                        color={colors.error}
                       />
-                      <Text style={styles.dateButtonText}>
-                        {vehicle.inspectionDueDate
-                          ? dateUtils.formatDate(vehicle.inspectionDueDate)
-                          : 'Select Date'}
-                      </Text>
                     </TouchableOpacity>
-                  ) : (
-                    <View style={styles.dateDisplay}>
-                      <Text
-                        style={[
-                          styles.value,
-                          dateUtils.isOverdue(vehicle.inspectionDueDate) &&
-                            styles.overdueText,
-                          dateUtils.isDueSoon(vehicle.inspectionDueDate) &&
-                            styles.dueSoonText,
-                        ]}
-                      >
-                        {dateUtils.formatDate(vehicle.inspectionDueDate)}
-                      </Text>
-                      {dateUtils.isOverdue(vehicle.inspectionDueDate) && (
-                        <View style={styles.statusBadge}>
-                          <Text style={styles.overdueLabel}>OVERDUE</Text>
-                        </View>
-                      )}
-                      {dateUtils.isDueSoon(vehicle.inspectionDueDate) && (
-                        <View style={[styles.statusBadge, styles.dueSoonBadge]}>
-                          <Text style={styles.dueSoonLabel}>
-                            Due in {dateUtils.getDaysUntil(vehicle.inspectionDueDate)}{' '}
-                            days
-                          </Text>
-                        </View>
-                      )}
-                    </View>
-                  )}
+                  </View>
+                )}
 
-                  <Text style={styles.label}>Service Due Date</Text>
-                  {isEditing ? (
-                    <TouchableOpacity
-                      style={styles.dateButton}
-                      onPress={() =>
-                        setShowDatePicker({
-                          show: true,
-                          vehicleIndex: index,
-                          field: 'service',
-                        })
-                      }
+                <Text style={styles.label}>Registration Number</Text>
+                {isEditing ? (
+                  <TextInput
+                    style={styles.input}
+                    value={vehicle.registrationNumber}
+                    onChangeText={(text) =>
+                      updateVehicle(index, 'registrationNumber', text)
+                    }
+                    autoCapitalize="characters"
+                  />
+                ) : (
+                  <Text style={styles.value}>{vehicle.registrationNumber}</Text>
+                )}
+
+                <Text style={styles.label}>Make</Text>
+                {isEditing ? (
+                  <TextInput
+                    style={styles.input}
+                    value={vehicle.make}
+                    onChangeText={(text) => updateVehicle(index, 'make', text)}
+                  />
+                ) : (
+                  <Text style={styles.value}>{vehicle.make}</Text>
+                )}
+
+                <Text style={styles.label}>Model</Text>
+                {isEditing ? (
+                  <TextInput
+                    style={styles.input}
+                    value={vehicle.model}
+                    onChangeText={(text) => updateVehicle(index, 'model', text)}
+                  />
+                ) : (
+                  <Text style={styles.value}>{vehicle.model}</Text>
+                )}
+
+                <Text style={styles.label}>Year</Text>
+                {isEditing ? (
+                  <TextInput
+                    style={styles.input}
+                    value={vehicle.year}
+                    onChangeText={(text) => updateVehicle(index, 'year', text)}
+                    keyboardType="numeric"
+                  />
+                ) : (
+                  <Text style={styles.value}>{vehicle.year}</Text>
+                )}
+
+                <Text style={styles.label}>WOF Inspection Due Date</Text>
+                {isEditing ? (
+                  <TouchableOpacity
+                    style={styles.dateButton}
+                    onPress={() =>
+                      setShowDatePicker({
+                        show: true,
+                        vehicleIndex: index,
+                        field: 'inspection',
+                      })
+                    }
+                  >
+                    <IconSymbol
+                      ios_icon_name="calendar"
+                      android_material_icon_name="calendar-today"
+                      size={20}
+                      color={colors.primary}
+                    />
+                    <Text style={styles.dateButtonText}>
+                      {vehicle.inspectionDueDate
+                        ? dateUtils.formatDate(vehicle.inspectionDueDate)
+                        : 'Select Date'}
+                    </Text>
+                  </TouchableOpacity>
+                ) : (
+                  <View style={styles.dateDisplay}>
+                    <Text
+                      style={[
+                        styles.value,
+                        dateUtils.isOverdue(vehicle.inspectionDueDate) &&
+                          styles.overdueText,
+                        dateUtils.isDueSoon(vehicle.inspectionDueDate) &&
+                          styles.dueSoonText,
+                      ]}
                     >
-                      <IconSymbol
-                        ios_icon_name="calendar"
-                        android_material_icon_name="calendar-today"
-                        size={20}
-                        color={colors.primary}
-                      />
-                      <Text style={styles.dateButtonText}>
-                        {vehicle.serviceDueDate
-                          ? dateUtils.formatDate(vehicle.serviceDueDate)
-                          : 'Select Date'}
-                      </Text>
-                    </TouchableOpacity>
-                  ) : (
-                    <View style={styles.dateDisplay}>
-                      <Text
-                        style={[
-                          styles.value,
-                          dateUtils.isOverdue(vehicle.serviceDueDate) &&
-                            styles.overdueText,
-                          dateUtils.isDueSoon(vehicle.serviceDueDate) &&
-                            styles.dueSoonText,
-                        ]}
-                      >
-                        {dateUtils.formatDate(vehicle.serviceDueDate)}
-                      </Text>
-                      {dateUtils.isOverdue(vehicle.serviceDueDate) && (
-                        <View style={styles.statusBadge}>
-                          <Text style={styles.overdueLabel}>OVERDUE</Text>
-                        </View>
-                      )}
-                      {dateUtils.isDueSoon(vehicle.serviceDueDate) && (
-                        <View style={[styles.statusBadge, styles.dueSoonBadge]}>
-                          <Text style={styles.dueSoonLabel}>
-                            Due in {dateUtils.getDaysUntil(vehicle.serviceDueDate)} days
-                          </Text>
-                        </View>
-                      )}
-                    </View>
-                  )}
-                </View>
-              </React.Fragment>
-            )
-          )}
+                      {dateUtils.formatDate(vehicle.inspectionDueDate)}
+                    </Text>
+                    {dateUtils.isOverdue(vehicle.inspectionDueDate) && (
+                      <View style={styles.statusBadge}>
+                        <Text style={styles.overdueLabel}>OVERDUE</Text>
+                      </View>
+                    )}
+                    {dateUtils.isDueSoon(vehicle.inspectionDueDate) && (
+                      <View style={[styles.statusBadge, styles.dueSoonBadge]}>
+                        <Text style={styles.dueSoonLabel}>
+                          Due in {dateUtils.getDaysUntil(vehicle.inspectionDueDate)}{' '}
+                          days
+                        </Text>
+                      </View>
+                    )}
+                  </View>
+                )}
+
+                <Text style={styles.label}>Service Due Date</Text>
+                {isEditing ? (
+                  <TouchableOpacity
+                    style={styles.dateButton}
+                    onPress={() =>
+                      setShowDatePicker({
+                        show: true,
+                        vehicleIndex: index,
+                        field: 'service',
+                      })
+                    }
+                  >
+                    <IconSymbol
+                      ios_icon_name="calendar"
+                      android_material_icon_name="calendar-today"
+                      size={20}
+                      color={colors.primary}
+                    />
+                    <Text style={styles.dateButtonText}>
+                      {vehicle.serviceDueDate
+                        ? dateUtils.formatDate(vehicle.serviceDueDate)
+                        : 'Select Date'}
+                    </Text>
+                  </TouchableOpacity>
+                ) : (
+                  <View style={styles.dateDisplay}>
+                    <Text
+                      style={[
+                        styles.value,
+                        dateUtils.isOverdue(vehicle.serviceDueDate) &&
+                          styles.overdueText,
+                        dateUtils.isDueSoon(vehicle.serviceDueDate) &&
+                          styles.dueSoonText,
+                      ]}
+                    >
+                      {dateUtils.formatDate(vehicle.serviceDueDate)}
+                    </Text>
+                    {dateUtils.isOverdue(vehicle.serviceDueDate) && (
+                      <View style={styles.statusBadge}>
+                        <Text style={styles.overdueLabel}>OVERDUE</Text>
+                      </View>
+                    )}
+                    {dateUtils.isDueSoon(vehicle.serviceDueDate) && (
+                      <View style={[styles.statusBadge, styles.dueSoonBadge]}>
+                        <Text style={styles.dueSoonLabel}>
+                          Due in {dateUtils.getDaysUntil(vehicle.serviceDueDate)} days
+                        </Text>
+                      </View>
+                    )}
+                  </View>
+                )}
+              </View>
+            </React.Fragment>
+          ))}
         </View>
 
         {isEditing && (
@@ -570,6 +615,27 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 20,
     fontWeight: 'bold',
+    color: colors.text,
+  },
+  searchContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.card,
+    marginHorizontal: 20,
+    marginTop: 16,
+    marginBottom: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  searchIcon: {
+    marginRight: 8,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 16,
     color: colors.text,
   },
   scrollView: {

@@ -28,3 +28,13 @@ export interface ReminderSettings {
   enableSmsReminders: boolean;
   reminderDaysBefore: number;
 }
+
+export interface UserProfile {
+  id: string;
+  email: string;
+  full_name: string | null;
+  user_id: string | null;
+  role: 'admin' | 'user';
+  created_at: string;
+  updated_at: string;
+}

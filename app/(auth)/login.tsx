@@ -16,30 +16,55 @@ import { useRouter } from 'expo-router';
 import { useAuth } from '@/contexts/AuthContext';
 import { colors } from '@/styles/commonStyles';
 import { IconSymbol } from '@/components/IconSymbol';
+import { supabase } from '@/integrations/supabase/client';
 
 export default function LoginScreen() {
   const router = useRouter();
   const { signIn } = useAuth();
-  const [email, setEmail] = useState('');
+  const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
 
   const handleLogin = async () => {
-    if (!email || !password) {
-      Alert.alert('Error', 'Please enter both email and password');
+    if (!identifier || !password) {
+      Alert.alert('Error', 'Please enter both email/user ID and password');
       return;
     }
 
     setLoading(true);
     try {
+      let email = identifier;
+
+      if (!identifier.includes('@')) {
+        console.log('Identifier is not an email, looking up user_id:', identifier);
+        const { data, error } = await supabase
+          .from('user_profiles')
+          .select('email')
+          .eq('user_id', identifier)
+          .single();
+
+        if (error || !data) {
+          console.error('User ID lookup error:', error);
+          Alert.alert(
+            'Login Failed',
+            'Invalid user ID or password. Please try again.'
+          );
+          setLoading(false);
+          return;
+        }
+
+        email = data.email;
+        console.log('Found email for user_id:', email);
+      }
+
       const { error } = await signIn(email, password);
 
       if (error) {
         console.error('Login error:', error);
         Alert.alert(
           'Login Failed',
-          error.message || 'Invalid email or password. Please try again.'
+          error.message || 'Invalid email/user ID or password. Please try again.'
         );
       } else {
         console.log('Login successful');
@@ -77,21 +102,21 @@ export default function LoginScreen() {
 
         <View style={styles.form}>
           <View style={styles.inputContainer}>
-            <Text style={styles.label}>Email</Text>
+            <Text style={styles.label}>Email or User ID</Text>
             <View style={styles.inputWrapper}>
               <IconSymbol
-                ios_icon_name="envelope.fill"
-                android_material_icon_name="email"
+                ios_icon_name="person.fill"
+                android_material_icon_name="person"
                 size={20}
                 color={colors.textSecondary}
                 style={styles.inputIcon}
               />
               <TextInput
                 style={styles.input}
-                placeholder="Enter your email"
+                placeholder="Enter your email or user ID"
                 placeholderTextColor={colors.textSecondary}
-                value={email}
-                onChangeText={setEmail}
+                value={identifier}
+                onChangeText={setIdentifier}
                 autoCapitalize="none"
                 keyboardType="email-address"
                 editable={!loading}
@@ -154,7 +179,7 @@ export default function LoginScreen() {
               color={colors.primary}
             />
             <Text style={styles.infoText}>
-              User accounts must be created by an administrator. Contact your admin if you need access.
+              User accounts must be created by an administrator. Contact your admin if you need access. You can log in using either your email address or custom user ID.
             </Text>
           </View>
         </View>
