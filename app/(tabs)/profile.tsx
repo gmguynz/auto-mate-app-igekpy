@@ -10,6 +10,7 @@ import {
   ActivityIndicator,
   TextInput,
   Modal,
+  Platform,
 } from 'react-native';
 import { useAuth } from '@/contexts/AuthContext';
 import { colors } from '@/styles/commonStyles';
@@ -25,6 +26,7 @@ export default function ProfileScreen() {
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [changingPassword, setChangingPassword] = useState(false);
+  const [signingOut, setSigningOut] = useState(false);
 
   const handleSignOut = async () => {
     Alert.alert('Sign Out', 'Are you sure you want to sign out?', [
@@ -33,8 +35,18 @@ export default function ProfileScreen() {
         text: 'Sign Out',
         style: 'destructive',
         onPress: async () => {
-          await signOut();
-          router.replace('/(auth)/login');
+          setSigningOut(true);
+          try {
+            console.log('Signing out...');
+            await signOut();
+            console.log('Sign out successful, redirecting to login...');
+            router.replace('/(auth)/login');
+          } catch (error) {
+            console.error('Sign out error:', error);
+            Alert.alert('Error', 'Failed to sign out. Please try again.');
+          } finally {
+            setSigningOut(false);
+          }
         },
       },
     ]);
@@ -229,6 +241,7 @@ export default function ProfileScreen() {
           <TouchableOpacity
             style={styles.actionButton}
             onPress={() => setShowPasswordModal(true)}
+            activeOpacity={0.7}
           >
             <IconSymbol
               ios_icon_name="key.fill"
@@ -242,6 +255,7 @@ export default function ProfileScreen() {
           <TouchableOpacity
             style={styles.actionButton}
             onPress={handleResetPasswordEmail}
+            activeOpacity={0.7}
           >
             <IconSymbol
               ios_icon_name="envelope.fill"
@@ -260,6 +274,7 @@ export default function ProfileScreen() {
             style={styles.actionButton}
             onPress={handleRefreshProfile}
             disabled={refreshing}
+            activeOpacity={0.7}
           >
             <IconSymbol
               ios_icon_name="arrow.clockwise"
@@ -276,6 +291,7 @@ export default function ProfileScreen() {
           <TouchableOpacity
             style={styles.actionButton}
             onPress={handleViewMetadata}
+            activeOpacity={0.7}
           >
             <IconSymbol
               ios_icon_name="info.circle"
@@ -289,6 +305,8 @@ export default function ProfileScreen() {
           <TouchableOpacity
             style={[styles.actionButton, styles.signOutButton]}
             onPress={handleSignOut}
+            disabled={signingOut}
+            activeOpacity={0.7}
           >
             <IconSymbol
               ios_icon_name="rectangle.portrait.and.arrow.right"
@@ -297,8 +315,9 @@ export default function ProfileScreen() {
               color="#FF3B30"
             />
             <Text style={[styles.actionButtonText, styles.signOutButtonText]}>
-              Sign Out
+              {signingOut ? 'Signing Out...' : 'Sign Out'}
             </Text>
+            {signingOut && <ActivityIndicator size="small" color="#FF3B30" />}
           </TouchableOpacity>
         </View>
       </ScrollView>
@@ -316,6 +335,7 @@ export default function ProfileScreen() {
               <TouchableOpacity
                 onPress={() => setShowPasswordModal(false)}
                 style={styles.modalCloseButton}
+                activeOpacity={0.7}
               >
                 <IconSymbol
                   ios_icon_name="xmark.circle.fill"
@@ -364,6 +384,7 @@ export default function ProfileScreen() {
                 ]}
                 onPress={handleChangePassword}
                 disabled={changingPassword}
+                activeOpacity={0.7}
               >
                 {changingPassword ? (
                   <ActivityIndicator size="small" color="#FFFFFF" />
@@ -375,6 +396,7 @@ export default function ProfileScreen() {
               <TouchableOpacity
                 style={styles.modalCancelButton}
                 onPress={() => setShowPasswordModal(false)}
+                activeOpacity={0.7}
               >
                 <Text style={styles.modalCancelButtonText}>Cancel</Text>
               </TouchableOpacity>
@@ -483,12 +505,15 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
     gap: 12,
+    cursor: Platform.OS === 'web' ? 'pointer' : undefined,
+    userSelect: Platform.OS === 'web' ? 'none' : undefined,
   },
   actionButtonText: {
     fontSize: 16,
     color: colors.text,
     fontWeight: '500',
     flex: 1,
+    userSelect: Platform.OS === 'web' ? 'none' : undefined,
   },
   signOutButton: {
     borderColor: '#FF3B30',
@@ -526,6 +551,8 @@ const styles = StyleSheet.create({
   },
   modalCloseButton: {
     padding: 4,
+    cursor: Platform.OS === 'web' ? 'pointer' : undefined,
+    userSelect: Platform.OS === 'web' ? 'none' : undefined,
   },
   modalBody: {
     padding: 20,
@@ -551,6 +578,8 @@ const styles = StyleSheet.create({
     padding: 12,
     fontSize: 16,
     color: colors.text,
+    cursor: Platform.OS === 'web' ? 'text' : undefined,
+    outlineStyle: Platform.OS === 'web' ? 'none' : undefined,
   },
   helperText: {
     fontSize: 12,
@@ -564,21 +593,28 @@ const styles = StyleSheet.create({
     padding: 16,
     alignItems: 'center',
     marginBottom: 12,
+    cursor: Platform.OS === 'web' ? 'pointer' : undefined,
+    userSelect: Platform.OS === 'web' ? 'none' : undefined,
   },
   modalButtonDisabled: {
     opacity: 0.6,
+    cursor: Platform.OS === 'web' ? 'not-allowed' : undefined,
   },
   modalButtonText: {
     color: '#FFFFFF',
     fontSize: 16,
     fontWeight: '600',
+    userSelect: Platform.OS === 'web' ? 'none' : undefined,
   },
   modalCancelButton: {
     padding: 12,
     alignItems: 'center',
+    cursor: Platform.OS === 'web' ? 'pointer' : undefined,
+    userSelect: Platform.OS === 'web' ? 'none' : undefined,
   },
   modalCancelButtonText: {
     color: colors.textSecondary,
     fontSize: 16,
+    userSelect: Platform.OS === 'web' ? 'none' : undefined,
   },
 });

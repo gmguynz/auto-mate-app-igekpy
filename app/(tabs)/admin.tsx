@@ -290,6 +290,7 @@ export default function AdminScreen() {
           style: 'destructive',
           onPress: async () => {
             try {
+              console.log('Deleting user:', userId);
               const { error } = await supabase
                 .from('user_profiles')
                 .delete()
@@ -301,6 +302,7 @@ export default function AdminScreen() {
                 return;
               }
 
+              console.log('User deleted successfully');
               Alert.alert('Success', 'User deleted successfully');
               loadUsers(false);
             } catch (error) {
@@ -330,6 +332,7 @@ export default function AdminScreen() {
           text: 'Change',
           onPress: async () => {
             try {
+              console.log('Changing role for user:', userId, 'to', newRole);
               const { error } = await supabase
                 .from('user_profiles')
                 .update({ role: newRole, updated_at: new Date().toISOString() })
@@ -341,6 +344,7 @@ export default function AdminScreen() {
                 return;
               }
 
+              console.log('Role updated successfully');
               Alert.alert(
                 'Success', 
                 'Role updated successfully. The user will need to log out and log back in for the changes to take effect.'

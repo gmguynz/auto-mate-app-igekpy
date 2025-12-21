@@ -10,6 +10,7 @@ import {
   Alert,
   Platform,
   Modal,
+  ActivityIndicator,
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import DateTimePicker from '@react-native-community/datetimepicker';
@@ -32,9 +33,16 @@ export default function CustomerDetailScreen() {
     field: 'inspection' | 'service';
   }>({ show: false, vehicleIndex: -1, field: 'inspection' });
   const [searchQuery, setSearchQuery] = useState('');
+  const [showTransferModal, setShowTransferModal] = useState(false);
+  const [transferVehicleIndex, setTransferVehicleIndex] = useState(-1);
+  const [allCustomers, setAllCustomers] = useState<Customer[]>([]);
+  const [selectedNewOwner, setSelectedNewOwner] = useState<Customer | null>(null);
+  const [transferring, setTransferring] = useState(false);
+  const [customerSearchQuery, setCustomerSearchQuery] = useState('');
 
   useEffect(() => {
     loadCustomer();
+    loadAllCustomers();
   }, [id]);
 
   const loadCustomer = async () => {
@@ -43,6 +51,11 @@ export default function CustomerDetailScreen() {
       setCustomer(data);
       setEditedCustomer(data);
     }
+  };
+
+  const loadAllCustomers = async () => {
+    const customers = await storageUtils.getCustomers();
+    setAllCustomers(customers);
   };
 
   const handleSave = async () => {
@@ -120,6 +133,62 @@ export default function CustomerDetailScreen() {
     }
   };
 
+  const handleTransferVehicle = (vehicleIndex: number) => {
+    setTransferVehicleIndex(vehicleIndex);
+    setShowTransferModal(true);
+    setSelectedNewOwner(null);
+    setCustomerSearchQuery('');
+  };
+
+  const confirmTransferVehicle = async () => {
+    if (!customer || !selectedNewOwner || transferVehicleIndex < 0) return;
+
+    setTransferring(true);
+    try {
+      const vehicleToTransfer = customer.vehicles[transferVehicleIndex];
+      
+      // Remove vehicle from current owner
+      const updatedCurrentOwner = {
+        ...customer,
+        vehicles: customer.vehicles.filter((_, i) => i !== transferVehicleIndex),
+        updatedAt: new Date().toISOString(),
+      };
+
+      // Add vehicle to new owner
+      const updatedNewOwner = {
+        ...selectedNewOwner,
+        vehicles: [...selectedNewOwner.vehicles, vehicleToTransfer],
+        updatedAt: new Date().toISOString(),
+      };
+
+      // Update both customers
+      await storageUtils.updateCustomer(updatedCurrentOwner);
+      await storageUtils.updateCustomer(updatedNewOwner);
+
+      // Reschedule notifications
+      console.log('Rescheduling notifications after vehicle transfer...');
+      await notificationService.scheduleAllReminders();
+
+      Alert.alert(
+        'Success',
+        `Vehicle ${vehicleToTransfer.registrationNumber} has been transferred to ${getCustomerDisplayName(selectedNewOwner)}`
+      );
+
+      setShowTransferModal(false);
+      setTransferVehicleIndex(-1);
+      setSelectedNewOwner(null);
+      
+      // Reload customer data
+      await loadCustomer();
+      await loadAllCustomers();
+    } catch (error) {
+      console.error('Error transferring vehicle:', error);
+      Alert.alert('Error', 'Failed to transfer vehicle. Please try again.');
+    } finally {
+      setTransferring(false);
+    }
+  };
+
   const handleDateChange = (event: any, selectedDate?: Date) => {
     if (Platform.OS === 'android') {
       setShowDatePicker({ show: false, vehicleIndex: -1, field: 'inspection' });
@@ -159,6 +228,21 @@ export default function CustomerDetailScreen() {
     );
   };
 
+  const getFilteredCustomers = () => {
+    if (!customerSearchQuery.trim()) {
+      return allCustomers.filter((c) => c.id !== customer?.id);
+    }
+    const query = customerSearchQuery.toLowerCase();
+    return allCustomers.filter(
+      (c) =>
+        c.id !== customer?.id &&
+        (c.firstName.toLowerCase().includes(query) ||
+          c.lastName.toLowerCase().includes(query) ||
+          c.companyName.toLowerCase().includes(query) ||
+          c.email.toLowerCase().includes(query))
+    );
+  };
+
   const renderDatePicker = () => {
     if (!showDatePicker.show || showDatePicker.vehicleIndex < 0 || !editedCustomer) {
       return null;
@@ -179,7 +263,7 @@ export default function CustomerDetailScreen() {
           <View style={styles.modalOverlay}>
             <View style={styles.modalContent}>
               <View style={styles.modalHeader}>
-                <TouchableOpacity onPress={closeDatePicker}>
+                <TouchableOpacity onPress={closeDatePicker} activeOpacity={0.7}>
                   <Text style={styles.modalDoneButton}>Done</Text>
                 </TouchableOpacity>
               </View>
@@ -213,7 +297,7 @@ export default function CustomerDetailScreen() {
     return (
       <View style={styles.container}>
         <View style={styles.header}>
-          <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+          <TouchableOpacity onPress={() => router.back()} style={styles.backButton} activeOpacity={0.7}>
             <IconSymbol
               ios_icon_name="chevron.left"
               android_material_icon_name="arrow-back"
@@ -225,6 +309,7 @@ export default function CustomerDetailScreen() {
           <View style={{ width: 40 }} />
         </View>
         <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={colors.primary} />
           <Text style={styles.loadingText}>Loading...</Text>
         </View>
       </View>
@@ -237,7 +322,7 @@ export default function CustomerDetailScreen() {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+        <TouchableOpacity onPress={() => router.back()} style={styles.backButton} activeOpacity={0.7}>
           <IconSymbol
             ios_icon_name="chevron.left"
             android_material_icon_name="arrow-back"
@@ -247,7 +332,7 @@ export default function CustomerDetailScreen() {
         </TouchableOpacity>
         <Text style={styles.title}>{getCustomerDisplayName(customer)}</Text>
         {!isEditing ? (
-          <TouchableOpacity onPress={() => setIsEditing(true)} style={styles.editButton}>
+          <TouchableOpacity onPress={() => setIsEditing(true)} style={styles.editButton} activeOpacity={0.7}>
             <IconSymbol
               ios_icon_name="pencil"
               android_material_icon_name="edit"
@@ -277,7 +362,7 @@ export default function CustomerDetailScreen() {
             onChangeText={setSearchQuery}
           />
           {searchQuery.length > 0 && (
-            <TouchableOpacity onPress={() => setSearchQuery('')}>
+            <TouchableOpacity onPress={() => setSearchQuery('')} activeOpacity={0.7}>
               <IconSymbol
                 ios_icon_name="xmark.circle.fill"
                 android_material_icon_name="cancel"
@@ -388,7 +473,7 @@ export default function CustomerDetailScreen() {
               Vehicles {!isEditing && searchQuery && `(${filteredVehicles.length})`}
             </Text>
             {isEditing && (
-              <TouchableOpacity onPress={addVehicle} style={styles.addButton}>
+              <TouchableOpacity onPress={addVehicle} style={styles.addButton} activeOpacity={0.7}>
                 <IconSymbol
                   ios_icon_name="plus.circle.fill"
                   android_material_icon_name="add-circle"
@@ -405,14 +490,29 @@ export default function CustomerDetailScreen() {
                 {isEditing && (
                   <View style={styles.vehicleHeader}>
                     <Text style={styles.vehicleTitle}>Vehicle {index + 1}</Text>
-                    <TouchableOpacity onPress={() => removeVehicle(index)}>
-                      <IconSymbol
-                        ios_icon_name="trash"
-                        android_material_icon_name="delete"
-                        size={20}
-                        color={colors.error}
-                      />
-                    </TouchableOpacity>
+                    <View style={styles.vehicleActions}>
+                      <TouchableOpacity 
+                        onPress={() => handleTransferVehicle(index)}
+                        style={styles.transferButton}
+                        activeOpacity={0.7}
+                      >
+                        <IconSymbol
+                          ios_icon_name="arrow.right.circle"
+                          android_material_icon_name="swap-horiz"
+                          size={20}
+                          color={colors.primary}
+                        />
+                        <Text style={styles.transferButtonText}>Transfer</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity onPress={() => removeVehicle(index)} activeOpacity={0.7}>
+                        <IconSymbol
+                          ios_icon_name="trash"
+                          android_material_icon_name="delete"
+                          size={20}
+                          color={colors.error}
+                        />
+                      </TouchableOpacity>
+                    </View>
                   </View>
                 )}
 
@@ -475,6 +575,7 @@ export default function CustomerDetailScreen() {
                         field: 'inspection',
                       })
                     }
+                    activeOpacity={0.7}
                   >
                     <IconSymbol
                       ios_icon_name="calendar"
@@ -528,6 +629,7 @@ export default function CustomerDetailScreen() {
                         field: 'service',
                       })
                     }
+                    activeOpacity={0.7}
                   >
                     <IconSymbol
                       ios_icon_name="calendar"
@@ -575,10 +677,10 @@ export default function CustomerDetailScreen() {
 
         {isEditing && (
           <View style={styles.buttonContainer}>
-            <TouchableOpacity style={styles.saveButton} onPress={handleSave}>
+            <TouchableOpacity style={styles.saveButton} onPress={handleSave} activeOpacity={0.7}>
               <Text style={styles.saveButtonText}>Save Changes</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.cancelButton} onPress={handleCancel}>
+            <TouchableOpacity style={styles.cancelButton} onPress={handleCancel} activeOpacity={0.7}>
               <Text style={styles.cancelButtonText}>Cancel</Text>
             </TouchableOpacity>
           </View>
@@ -586,6 +688,125 @@ export default function CustomerDetailScreen() {
       </ScrollView>
 
       {renderDatePicker()}
+
+      {/* Transfer Vehicle Modal */}
+      <Modal
+        visible={showTransferModal}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setShowTransferModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.transferModalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Transfer Vehicle</Text>
+              <TouchableOpacity 
+                onPress={() => setShowTransferModal(false)} 
+                activeOpacity={0.7}
+              >
+                <IconSymbol
+                  ios_icon_name="xmark.circle.fill"
+                  android_material_icon_name="close"
+                  size={28}
+                  color={colors.textSecondary}
+                />
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.transferModalBody}>
+              {transferVehicleIndex >= 0 && customer && (
+                <View style={styles.transferInfo}>
+                  <Text style={styles.transferInfoText}>
+                    Transfer vehicle{' '}
+                    <Text style={styles.transferInfoBold}>
+                      {customer.vehicles[transferVehicleIndex].registrationNumber}
+                    </Text>{' '}
+                    to a new owner
+                  </Text>
+                </View>
+              )}
+
+              <View style={styles.searchContainer}>
+                <IconSymbol
+                  ios_icon_name="magnifyingglass"
+                  android_material_icon_name="search"
+                  size={20}
+                  color={colors.textSecondary}
+                  style={styles.searchIcon}
+                />
+                <TextInput
+                  style={styles.searchInput}
+                  placeholder="Search customers..."
+                  placeholderTextColor={colors.textSecondary}
+                  value={customerSearchQuery}
+                  onChangeText={setCustomerSearchQuery}
+                />
+                {customerSearchQuery.length > 0 && (
+                  <TouchableOpacity 
+                    onPress={() => setCustomerSearchQuery('')}
+                    activeOpacity={0.7}
+                  >
+                    <IconSymbol
+                      ios_icon_name="xmark.circle.fill"
+                      android_material_icon_name="cancel"
+                      size={20}
+                      color={colors.textSecondary}
+                    />
+                  </TouchableOpacity>
+                )}
+              </View>
+
+              <ScrollView style={styles.customerList}>
+                {getFilteredCustomers().map((cust, index) => (
+                  <React.Fragment key={index}>
+                    <TouchableOpacity
+                      style={[
+                        styles.customerItem,
+                        selectedNewOwner?.id === cust.id && styles.customerItemSelected,
+                      ]}
+                      onPress={() => setSelectedNewOwner(cust)}
+                      activeOpacity={0.7}
+                    >
+                      <View style={styles.customerItemInfo}>
+                        <Text style={styles.customerItemName}>
+                          {getCustomerDisplayName(cust)}
+                        </Text>
+                        <Text style={styles.customerItemEmail}>{cust.email}</Text>
+                      </View>
+                      {selectedNewOwner?.id === cust.id && (
+                        <IconSymbol
+                          ios_icon_name="checkmark.circle.fill"
+                          android_material_icon_name="check-circle"
+                          size={24}
+                          color={colors.primary}
+                        />
+                      )}
+                    </TouchableOpacity>
+                  </React.Fragment>
+                ))}
+              </ScrollView>
+
+              <TouchableOpacity
+                style={[
+                  styles.transferConfirmButton,
+                  (!selectedNewOwner || transferring) && styles.transferConfirmButtonDisabled,
+                ]}
+                onPress={confirmTransferVehicle}
+                disabled={!selectedNewOwner || transferring}
+                activeOpacity={0.7}
+              >
+                {transferring ? (
+                  <ActivityIndicator color="#FFFFFF" />
+                ) : (
+                  <Text style={styles.transferConfirmButtonText}>
+                    Transfer Vehicle
+                  </Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -608,9 +829,13 @@ const styles = StyleSheet.create({
   },
   backButton: {
     padding: 8,
+    cursor: Platform.OS === 'web' ? 'pointer' : undefined,
+    userSelect: Platform.OS === 'web' ? 'none' : undefined,
   },
   editButton: {
     padding: 8,
+    cursor: Platform.OS === 'web' ? 'pointer' : undefined,
+    userSelect: Platform.OS === 'web' ? 'none' : undefined,
   },
   title: {
     fontSize: 20,
@@ -637,6 +862,8 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 16,
     color: colors.text,
+    cursor: Platform.OS === 'web' ? 'text' : undefined,
+    outlineStyle: Platform.OS === 'web' ? 'none' : undefined,
   },
   scrollView: {
     flex: 1,
@@ -653,6 +880,7 @@ const styles = StyleSheet.create({
   loadingText: {
     fontSize: 16,
     color: colors.textSecondary,
+    marginTop: 12,
   },
   section: {
     marginBottom: 24,
@@ -697,9 +925,13 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     fontSize: 16,
     color: colors.text,
+    cursor: Platform.OS === 'web' ? 'text' : undefined,
+    outlineStyle: Platform.OS === 'web' ? 'none' : undefined,
   },
   addButton: {
     padding: 8,
+    cursor: Platform.OS === 'web' ? 'pointer' : undefined,
+    userSelect: Platform.OS === 'web' ? 'none' : undefined,
   },
   vehicleCard: {
     backgroundColor: colors.card,
@@ -720,6 +952,28 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: colors.text,
   },
+  vehicleActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  transferButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    backgroundColor: colors.highlight,
+    borderRadius: 8,
+    cursor: Platform.OS === 'web' ? 'pointer' : undefined,
+    userSelect: Platform.OS === 'web' ? 'none' : undefined,
+  },
+  transferButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.primary,
+    userSelect: Platform.OS === 'web' ? 'none' : undefined,
+  },
   dateButton: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -730,10 +984,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 12,
     gap: 10,
+    cursor: Platform.OS === 'web' ? 'pointer' : undefined,
+    userSelect: Platform.OS === 'web' ? 'none' : undefined,
   },
   dateButtonText: {
     fontSize: 16,
     color: colors.text,
+    userSelect: Platform.OS === 'web' ? 'none' : undefined,
   },
   dateDisplay: {
     marginBottom: 4,
@@ -776,11 +1033,14 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     alignItems: 'center',
     marginBottom: 12,
+    cursor: Platform.OS === 'web' ? 'pointer' : undefined,
+    userSelect: Platform.OS === 'web' ? 'none' : undefined,
   },
   saveButtonText: {
     fontSize: 16,
     fontWeight: 'bold',
     color: colors.card,
+    userSelect: Platform.OS === 'web' ? 'none' : undefined,
   },
   cancelButton: {
     backgroundColor: colors.card,
@@ -789,11 +1049,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderWidth: 1,
     borderColor: colors.border,
+    cursor: Platform.OS === 'web' ? 'pointer' : undefined,
+    userSelect: Platform.OS === 'web' ? 'none' : undefined,
   },
   cancelButtonText: {
     fontSize: 16,
     fontWeight: '600',
     color: colors.text,
+    userSelect: Platform.OS === 'web' ? 'none' : undefined,
   },
   modalOverlay: {
     flex: 1,
@@ -808,7 +1071,8 @@ const styles = StyleSheet.create({
   },
   modalHeader: {
     flexDirection: 'row',
-    justifyContent: 'flex-end',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     padding: 16,
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
@@ -817,9 +1081,91 @@ const styles = StyleSheet.create({
     fontSize: 17,
     fontWeight: '600',
     color: colors.primary,
+    cursor: Platform.OS === 'web' ? 'pointer' : undefined,
+    userSelect: Platform.OS === 'web' ? 'none' : undefined,
   },
   iosDatePicker: {
     height: 216,
     backgroundColor: colors.card,
+  },
+  transferModalContent: {
+    backgroundColor: colors.background,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    maxHeight: '80%',
+  },
+  transferModalBody: {
+    padding: 20,
+    flex: 1,
+  },
+  transferInfo: {
+    backgroundColor: colors.highlight,
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 16,
+  },
+  transferInfoText: {
+    fontSize: 14,
+    color: colors.text,
+    lineHeight: 20,
+  },
+  transferInfoBold: {
+    fontWeight: 'bold',
+    color: colors.primary,
+  },
+  customerList: {
+    flex: 1,
+    marginBottom: 16,
+  },
+  customerItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: colors.card,
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: colors.border,
+    cursor: Platform.OS === 'web' ? 'pointer' : undefined,
+    userSelect: Platform.OS === 'web' ? 'none' : undefined,
+  },
+  customerItemSelected: {
+    borderColor: colors.primary,
+    borderWidth: 2,
+    backgroundColor: colors.highlight,
+  },
+  customerItemInfo: {
+    flex: 1,
+  },
+  customerItemName: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: colors.text,
+    marginBottom: 4,
+    userSelect: Platform.OS === 'web' ? 'none' : undefined,
+  },
+  customerItemEmail: {
+    fontSize: 14,
+    color: colors.textSecondary,
+    userSelect: Platform.OS === 'web' ? 'none' : undefined,
+  },
+  transferConfirmButton: {
+    backgroundColor: colors.primary,
+    borderRadius: 12,
+    padding: 16,
+    alignItems: 'center',
+    cursor: Platform.OS === 'web' ? 'pointer' : undefined,
+    userSelect: Platform.OS === 'web' ? 'none' : undefined,
+  },
+  transferConfirmButtonDisabled: {
+    opacity: 0.6,
+    cursor: Platform.OS === 'web' ? 'not-allowed' : undefined,
+  },
+  transferConfirmButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '600',
+    userSelect: Platform.OS === 'web' ? 'none' : undefined,
   },
 });

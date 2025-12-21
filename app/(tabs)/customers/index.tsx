@@ -10,6 +10,7 @@ import {
   Alert,
   ActivityIndicator,
   RefreshControl,
+  Platform,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { colors } from '@/styles/commonStyles';
@@ -18,6 +19,7 @@ import { Customer } from '@/types/customer';
 import { storageUtils } from '@/utils/storage';
 import { dateUtils } from '@/utils/dateUtils';
 import { useFocusEffect } from '@react-navigation/native';
+import { notificationService } from '@/utils/notificationService';
 
 export default function CustomersScreen() {
   const router = useRouter();
@@ -26,6 +28,7 @@ export default function CustomersScreen() {
   const [filteredCustomers, setFilteredCustomers] = useState<Customer[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const loadCustomers = async (showLoader = true) => {
     try {
@@ -86,19 +89,27 @@ export default function CustomersScreen() {
   const handleDeleteCustomer = (customerId: string, customerName: string) => {
     Alert.alert(
       'Delete Customer',
-      `Are you sure you want to delete ${customerName}?`,
+      `Are you sure you want to delete ${customerName}? This will also remove all their vehicles and reminders.`,
       [
         { text: 'Cancel', style: 'cancel' },
         {
           text: 'Delete',
           style: 'destructive',
           onPress: async () => {
+            setDeletingId(customerId);
             try {
+              console.log('Deleting customer:', customerId);
               await storageUtils.deleteCustomer(customerId);
+              console.log('Customer deleted, rescheduling notifications...');
+              await notificationService.scheduleAllReminders();
+              console.log('Reloading customers...');
               await loadCustomers(false);
+              Alert.alert('Success', 'Customer deleted successfully');
             } catch (error) {
               console.error('Error deleting customer:', error);
               Alert.alert('Error', 'Failed to delete customer. Please try again.');
+            } finally {
+              setDeletingId(null);
             }
           },
         },
@@ -150,6 +161,7 @@ export default function CustomersScreen() {
             <TouchableOpacity
               style={styles.remindersButton}
               onPress={() => router.push('/customers/reminders')}
+              activeOpacity={0.7}
             >
               <IconSymbol
                 ios_icon_name="bell.fill"
@@ -181,6 +193,7 @@ export default function CustomersScreen() {
           <TouchableOpacity
             style={styles.remindersButton}
             onPress={() => router.push('/customers/reminders')}
+            activeOpacity={0.7}
           >
             <IconSymbol
               ios_icon_name="bell.fill"
@@ -208,7 +221,7 @@ export default function CustomersScreen() {
           onChangeText={setSearchQuery}
         />
         {searchQuery.length > 0 && (
-          <TouchableOpacity onPress={() => setSearchQuery('')}>
+          <TouchableOpacity onPress={() => setSearchQuery('')} activeOpacity={0.7}>
             <IconSymbol
               ios_icon_name="xmark.circle.fill"
               android_material_icon_name="cancel"
@@ -253,12 +266,14 @@ export default function CustomersScreen() {
           filteredCustomers.map((customer, index) => {
             const reminders = getUpcomingReminders(customer);
             const displayName = getCustomerDisplayName(customer);
+            const isDeleting = deletingId === customer.id;
             return (
               <React.Fragment key={index}>
                 <TouchableOpacity
-                  style={styles.customerCard}
+                  style={[styles.customerCard, isDeleting && styles.customerCardDeleting]}
                   onPress={() => router.push(`/customers/${customer.id}`)}
                   activeOpacity={0.7}
+                  disabled={isDeleting}
                 >
                   <View style={styles.customerHeader}>
                     <View style={styles.customerInfo}>
@@ -309,13 +324,19 @@ export default function CustomersScreen() {
                     <TouchableOpacity
                       onPress={() => handleDeleteCustomer(customer.id, displayName)}
                       style={styles.deleteButton}
+                      disabled={isDeleting}
+                      activeOpacity={0.7}
                     >
-                      <IconSymbol
-                        ios_icon_name="trash"
-                        android_material_icon_name="delete"
-                        size={20}
-                        color={colors.error}
-                      />
+                      {isDeleting ? (
+                        <ActivityIndicator size="small" color={colors.error} />
+                      ) : (
+                        <IconSymbol
+                          ios_icon_name="trash"
+                          android_material_icon_name="delete"
+                          size={20}
+                          color={colors.error}
+                        />
+                      )}
                     </TouchableOpacity>
                   </View>
 
@@ -426,6 +447,8 @@ const styles = StyleSheet.create({
     padding: 8,
     backgroundColor: colors.background,
     borderRadius: 8,
+    cursor: Platform.OS === 'web' ? 'pointer' : undefined,
+    userSelect: Platform.OS === 'web' ? 'none' : undefined,
   },
   searchContainer: {
     flexDirection: 'row',
@@ -447,6 +470,8 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 16,
     color: colors.text,
+    cursor: Platform.OS === 'web' ? 'text' : undefined,
+    outlineStyle: Platform.OS === 'web' ? 'none' : undefined,
   },
   scrollView: {
     flex: 1,
@@ -491,6 +516,12 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     boxShadow: '0px 2px 4px rgba(0, 0, 0, 0.05)',
     elevation: 2,
+    cursor: Platform.OS === 'web' ? 'pointer' : undefined,
+    userSelect: Platform.OS === 'web' ? 'none' : undefined,
+  },
+  customerCardDeleting: {
+    opacity: 0.5,
+    cursor: Platform.OS === 'web' ? 'not-allowed' : undefined,
   },
   customerHeader: {
     flexDirection: 'row',
@@ -506,14 +537,18 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: colors.text,
     marginBottom: 6,
+    userSelect: Platform.OS === 'web' ? 'none' : undefined,
   },
   customerDetail: {
     fontSize: 14,
     color: colors.textSecondary,
     marginBottom: 4,
+    userSelect: Platform.OS === 'web' ? 'none' : undefined,
   },
   deleteButton: {
     padding: 8,
+    cursor: Platform.OS === 'web' ? 'pointer' : undefined,
+    userSelect: Platform.OS === 'web' ? 'none' : undefined,
   },
   vehiclesSection: {
     borderTopWidth: 1,
@@ -526,6 +561,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: colors.textSecondary,
     marginBottom: 8,
+    userSelect: Platform.OS === 'web' ? 'none' : undefined,
   },
   vehicleItem: {
     marginBottom: 6,
@@ -534,10 +570,12 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '600',
     color: colors.text,
+    userSelect: Platform.OS === 'web' ? 'none' : undefined,
   },
   vehicleDetails: {
     fontSize: 13,
     color: colors.textSecondary,
+    userSelect: Platform.OS === 'web' ? 'none' : undefined,
   },
   remindersSection: {
     marginTop: 12,
@@ -562,6 +600,7 @@ const styles = StyleSheet.create({
     color: colors.text,
     marginLeft: 6,
     fontWeight: '500',
+    userSelect: Platform.OS === 'web' ? 'none' : undefined,
   },
   reminderTextOverdue: {
     color: colors.error,
@@ -578,5 +617,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     boxShadow: '0px 4px 8px rgba(0, 0, 0, 0.2)',
     elevation: 6,
+    cursor: Platform.OS === 'web' ? 'pointer' : undefined,
+    userSelect: Platform.OS === 'web' ? 'none' : undefined,
   },
 });

@@ -210,7 +210,7 @@ Please call us on 07 866 2218 to book an appointment.
 Regards,
 Charlie's Workshop`;
 
-      console.log('Sending automated email...');
+      console.log('Sending automated email to:', reminder.customerEmail);
       const result = await emailService.sendEmail({
         to: reminder.customerEmail,
         subject,
@@ -221,6 +221,7 @@ Charlie's Workshop`;
       if (result.success) {
         Alert.alert('Success', `Email sent successfully to ${reminder.customerName}`);
       } else {
+        console.error('Email send failed:', result.error);
         Alert.alert(
           'Email Failed',
           result.error || 'Failed to send email',
