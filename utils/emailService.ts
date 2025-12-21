@@ -35,25 +35,56 @@ export const emailService = {
         body: {
           to: emailData.to,
           subject: emailData.subject,
-          html: htmlBody, // Changed from 'body' to 'html'
+          html: htmlBody,
           customerName: emailData.customerName,
         },
       });
 
       if (error) {
         console.error('Error invoking Edge Function:', error);
+        console.error('Error details:', JSON.stringify(error, null, 2));
+        
+        // Provide more specific error messages
+        let errorMessage = 'Failed to send email';
+        if (error.message) {
+          errorMessage = error.message;
+        }
+        
+        // Check for common configuration issues
+        if (error.message?.includes('not configured') || error.message?.includes('RESEND_API_KEY')) {
+          errorMessage = 'Email service not configured. Please add RESEND_API_KEY to Supabase Edge Function secrets.';
+        } else if (error.message?.includes('domain') || error.message?.includes('verification')) {
+          errorMessage = 'Email domain not verified. Please verify your domain in Resend dashboard.';
+        } else if (error.message?.includes('FROM_EMAIL')) {
+          errorMessage = 'FROM_EMAIL not configured. Please add FROM_EMAIL to Supabase Edge Function secrets.';
+        }
+        
         return {
           success: false,
-          error: error.message || 'Failed to send email',
+          error: errorMessage,
         };
       }
 
-      // Check if Resend returned an error
+      // Check if the response contains an error object
       if (data && data.error) {
         console.error('Resend API error:', data.error);
+        console.error('Full error response:', JSON.stringify(data, null, 2));
+        
+        let errorMessage = 'Email service error';
+        if (data.error.message) {
+          errorMessage = data.error.message;
+        }
+        
+        // Check for specific Resend errors
+        if (data.error.message?.includes('domain')) {
+          errorMessage = 'Email domain not verified. Please verify your domain in Resend dashboard.';
+        } else if (data.error.message?.includes('API key')) {
+          errorMessage = 'Invalid Resend API key. Please check your RESEND_API_KEY in Supabase secrets.';
+        }
+        
         return {
           success: false,
-          error: data.error.message || 'Email service error',
+          error: errorMessage,
         };
       }
 
@@ -64,13 +95,14 @@ export const emailService = {
       }
 
       // If we got here, something unexpected happened
-      console.warn('Unexpected response from email service:', data);
+      console.warn('Unexpected response from email service:', JSON.stringify(data, null, 2));
       return {
         success: false,
-        error: 'Unexpected response from email service. Please check your email configuration.',
+        error: 'Unexpected response from email service. Please check the Edge Function logs in Supabase dashboard.',
       };
     } catch (error) {
       console.error('Exception sending email:', error);
+      console.error('Exception details:', JSON.stringify(error, null, 2));
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Unknown error occurred',
@@ -85,10 +117,10 @@ export const emailService = {
     Alert.alert(
       'Email Service Setup Required',
       'To enable automated email sending, you need to:\n\n' +
-      '1. Set up a Supabase Edge Function named "send-reminder-email"\n' +
-      '2. Configure an email service (Resend, SendGrid, etc.)\n' +
-      '3. Add your email API key to Supabase secrets\n' +
-      '4. Update the "from" email address in the Edge Function\n\n' +
+      '1. Add RESEND_API_KEY to Supabase Edge Function secrets\n' +
+      '2. Add FROM_EMAIL to Supabase Edge Function secrets (e.g., noreply@yourdomain.com)\n' +
+      '3. Verify your domain in Resend dashboard\n' +
+      '4. Ensure DNS records (TXT and MX) are properly configured\n\n' +
       'See SUPABASE_SETUP.md for detailed instructions.',
       [{ text: 'OK' }]
     );

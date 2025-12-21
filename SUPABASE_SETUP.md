@@ -97,7 +97,7 @@ Your existing customer data will be uploaded to Supabase.
 
 ## Setting Up Automated Email Reminders
 
-To enable automated email sending (without opening the email client), you need to configure the Supabase Edge Function that has already been deployed.
+To enable automated email sending (without opening the email client), you need to configure the Supabase Edge Function with your email service credentials.
 
 ### Prerequisites
 
@@ -105,9 +105,9 @@ The Edge Function `send-reminder-email` is already deployed to your Supabase pro
 
 ### Step 1: Choose an Email Service
 
-We recommend **Resend** for its simplicity and reliability, but you can also use SendGrid or other services.
+We recommend **Resend** for its simplicity and reliability.
 
-#### Option A: Using Resend (Recommended)
+#### Using Resend (Recommended)
 
 **1. Sign up for Resend**
 - Go to [resend.com](https://resend.com)
@@ -123,57 +123,48 @@ We recommend **Resend** for its simplicity and reliability, but you can also use
   - **MX records** for receiving bounces (optional but recommended)
   - **DKIM records** for email authentication
 
+**Important**: Wait for domain verification to complete (usually 5-30 minutes, can take up to 48 hours)
+
 **3. Get Your API Key**
 - Go to **API Keys** in Resend dashboard
 - Click **Create API Key**
 - Give it a name (e.g., "Mechanic App")
 - Copy the API key (starts with `re_`)
 
-**4. Configure Supabase Secrets**
+**4. Configure Supabase Edge Function Secrets**
 
-Go to your Supabase project dashboard:
-1. Navigate to **Project Settings** → **Edge Functions** → **Secrets**
-2. Add the following secrets:
+This is the most critical step! Go to your Supabase project dashboard:
 
-```
-RESEND_API_KEY=re_your_actual_api_key_here
-FROM_EMAIL=reminders@yourdomain.com
-```
-
-**Important**: Replace `yourdomain.com` with your actual verified domain from Resend.
-
-#### Option B: Using SendGrid
-
-**1. Sign up for SendGrid**
-- Go to [sendgrid.com](https://sendgrid.com)
-- Create a free account (100 emails/day)
-
-**2. Verify Your Domain**
-- Follow SendGrid's domain verification process
-- Add the required DNS records
-
-**3. Get Your API Key**
-- Go to **Settings** → **API Keys**
-- Create a new API key with "Mail Send" permissions
-
-**4. Configure Supabase Secrets**
+1. Navigate to **Project Settings** (gear icon in sidebar)
+2. Click **Edge Functions** in the left menu
+3. Click on the **Secrets** tab
+4. Add the following secrets by clicking **Add new secret**:
 
 ```
-SENDGRID_API_KEY=SG.your_actual_api_key_here
-FROM_EMAIL=reminders@yourdomain.com
+Secret Name: RESEND_API_KEY
+Secret Value: re_your_actual_api_key_here
 ```
 
-**5. Update the Edge Function**
+```
+Secret Name: FROM_EMAIL
+Secret Value: reminders@yourdomain.com
+```
 
-You'll need to modify the Edge Function to use SendGrid's API instead of Resend. Contact support or refer to SendGrid's documentation.
+**Critical Notes**:
+- Replace `re_your_actual_api_key_here` with your actual Resend API key
+- Replace `yourdomain.com` with your actual verified domain from Resend
+- The FROM_EMAIL must use a domain that is verified in Resend
+- After adding secrets, the Edge Function will automatically use them (no restart needed)
 
-### Step 2: Test the Email Function
+### Step 2: Verify Edge Function Configuration
 
-After configuring the secrets:
+After adding the secrets:
 
 1. Go to **Edge Functions** in your Supabase dashboard
-2. Select `send-reminder-email`
-3. Click **Invoke** and test with sample data:
+2. Click on `send-reminder-email`
+3. Click the **Logs** tab
+4. Click **Invoke function** to test it
+5. Use this test payload:
 
 ```json
 {
@@ -184,21 +175,69 @@ After configuring the secrets:
 }
 ```
 
-4. Check your email inbox (and spam folder) for the test email
+6. Click **Send request**
+7. Check the response and logs:
+   - **Success**: You should see status 200 and a Resend ID in the response
+   - **Error**: Check the logs for specific error messages
 
-### Step 3: Verify in the App
+### Step 3: Test in the App
 
 1. Open your app
 2. Go to **Reminders** screen
 3. Tap on a reminder
-4. You should now see **"Send Email (Auto)"** option
-5. Select it to send an automated email
+4. Select **"Send Email (Auto)"** option
+5. Check your email inbox (and spam folder)
 
 ### Common Issues and Solutions
 
-#### Issue: "Email service not configured"
+#### Issue: "Edge Function returned a non-2xx status code"
 
-**Solution**: Make sure you've added both `RESEND_API_KEY` and `FROM_EMAIL` to Supabase secrets. Restart your app after adding secrets.
+This is the error you're currently seeing. It means the Edge Function is failing. Here's how to diagnose:
+
+**Step 1: Check Edge Function Logs**
+1. Go to Supabase dashboard → **Edge Functions** → `send-reminder-email` → **Logs**
+2. Look for the most recent error messages
+3. Common errors and solutions:
+
+**Error: "RESEND_API_KEY is not configured"**
+- **Solution**: You haven't added the RESEND_API_KEY secret to Supabase
+- Go to **Project Settings** → **Edge Functions** → **Secrets**
+- Add `RESEND_API_KEY` with your Resend API key
+
+**Error: "Invalid API key" or 403 status**
+- **Solution**: Your Resend API key is incorrect or expired
+- Go to Resend dashboard → **API Keys**
+- Create a new API key and update the Supabase secret
+
+**Error: "Domain not verified" or 422 status**
+- **Solution**: Your FROM_EMAIL domain is not verified in Resend
+- Go to Resend dashboard → **Domains**
+- Verify your domain is showing as "Verified"
+- If not, check your DNS records
+- Make sure FROM_EMAIL uses the verified domain (e.g., `reminders@yourdomain.com`)
+
+**Error: "Missing required fields"**
+- **Solution**: The app is not sending the correct data format
+- This should be fixed in the latest version
+- Make sure you've updated the app code
+
+**Step 2: Verify DNS Records**
+
+If your domain is not verified in Resend:
+
+1. Go to your domain provider (GoDaddy, Namecheap, Cloudflare, etc.)
+2. Add the DNS records shown in Resend dashboard
+3. Wait 5-30 minutes for DNS propagation
+4. Check verification status in Resend
+
+**Step 3: Test Directly in Resend**
+
+To verify your Resend setup is working:
+
+1. Go to Resend dashboard
+2. Click **Send Test Email**
+3. Send a test email to yourself
+4. If this fails, the issue is with your Resend configuration, not the app
 
 #### Issue: Emails not arriving
 
@@ -207,37 +246,25 @@ After configuring the secrets:
 2. **Wrong FROM_EMAIL**: Must match a verified domain in Resend
 3. **Emails in spam**: Check spam folder, add SPF/DKIM records to improve deliverability
 4. **API key invalid**: Verify the API key is correct and active
+5. **Rate limit**: Free plan has 100 emails/day limit
 
 **Debugging steps**:
-1. Check Edge Function logs in Supabase dashboard
-2. Look for error messages in the logs
+1. Check Edge Function logs in Supabase dashboard for detailed error messages
+2. Look for the Resend API response in the logs
 3. Test the function directly from Supabase dashboard
 4. Verify DNS records are properly configured
+5. Check Resend dashboard for delivery status
 
-#### Issue: "Failed to send email" error
+#### Issue: "Email service not configured"
 
 **Solution**: 
-1. Check Edge Function logs for detailed error messages
-2. Verify your API key has not expired
-3. Ensure you haven't exceeded your email quota
-4. Check that the FROM_EMAIL matches your verified domain
-
-#### Issue: Function returns 200 but no email arrives
-
-**This is your current issue!** The function was returning success but emails weren't being sent because:
-1. The FROM_EMAIL was hardcoded as `you@example.com` (not a verified domain)
-2. The app was sending `body` but the function expected `html`
-3. Error handling was insufficient
-
-**Solution**: The Edge Function has been updated to:
-- Use the `FROM_EMAIL` environment variable
-- Accept `html` parameter (the app now sends this)
-- Properly validate and return errors
-- Log detailed information for debugging
+- Make sure you've added both `RESEND_API_KEY` and `FROM_EMAIL` to Supabase Edge Function secrets
+- Restart your app after adding secrets
+- Check that the secrets are in the correct format (no extra spaces or quotes)
 
 ### Step 4: DNS Configuration Details
 
-For best email deliverability, configure these DNS records:
+For best email deliverability, configure these DNS records in your domain provider:
 
 **For Resend:**
 
@@ -246,6 +273,7 @@ For best email deliverability, configure these DNS records:
    Type: TXT
    Name: @ (or your domain)
    Value: [provided by Resend]
+   TTL: 3600 (or default)
    ```
 
 2. **DKIM (TXT)**
@@ -253,6 +281,7 @@ For best email deliverability, configure these DNS records:
    Type: TXT
    Name: resend._domainkey
    Value: [provided by Resend]
+   TTL: 3600 (or default)
    ```
 
 3. **SPF (TXT)** - Add to existing SPF record or create new:
@@ -260,6 +289,7 @@ For best email deliverability, configure these DNS records:
    Type: TXT
    Name: @
    Value: v=spf1 include:_spf.resend.com ~all
+   TTL: 3600 (or default)
    ```
 
 4. **MX Records** (optional, for bounce handling):
@@ -267,19 +297,22 @@ For best email deliverability, configure these DNS records:
    Type: MX
    Priority: 10
    Value: feedback-smtp.resend.com
+   TTL: 3600 (or default)
    ```
 
-**Verification**: After adding DNS records, it may take up to 48 hours to propagate, but usually happens within minutes to hours.
+**Verification**: After adding DNS records, it may take up to 48 hours to propagate, but usually happens within minutes to hours. You can check DNS propagation at [whatsmydns.net](https://www.whatsmydns.net/)
 
 ### Step 5: Production Checklist
 
 Before going live:
 
-- [ ] Domain verified in Resend/SendGrid
-- [ ] All DNS records added and verified
-- [ ] API keys added to Supabase secrets
-- [ ] FROM_EMAIL configured with verified domain
-- [ ] Test email sent successfully
+- [ ] Domain verified in Resend (shows "Verified" status)
+- [ ] All DNS records added and verified (TXT, DKIM, SPF)
+- [ ] RESEND_API_KEY added to Supabase Edge Function secrets
+- [ ] FROM_EMAIL added to Supabase Edge Function secrets
+- [ ] FROM_EMAIL uses verified domain (e.g., `reminders@yourdomain.com`)
+- [ ] Test email sent successfully from Supabase dashboard
+- [ ] Test email sent successfully from app
 - [ ] Emails arriving in inbox (not spam)
 - [ ] Edge Function logs show no errors
 - [ ] App shows "Send Email (Auto)" option
@@ -293,44 +326,53 @@ After setup, you should see:
 - ✅ Your data visible in the Supabase dashboard under **Table Editor** → **customers**
 - ✅ "Send Email (Auto)" option when tapping reminders
 - ✅ Emails arriving successfully when sent
+- ✅ Edge Function logs showing "Email sent successfully" with Resend ID
 
-## Troubleshooting
+## Troubleshooting Checklist
 
-### "Supabase not configured" message
+If emails are not working, go through this checklist:
 
-- Make sure you created the `.env` file with the correct keys
-- Restart your development server
-- Check that the environment variables start with `EXPO_PUBLIC_`
+1. **Supabase Edge Function Secrets**
+   - [ ] RESEND_API_KEY is set in Supabase Edge Function secrets
+   - [ ] FROM_EMAIL is set in Supabase Edge Function secrets
+   - [ ] No extra spaces or quotes in the secret values
 
-### "Error getting customers from Supabase"
+2. **Resend Configuration**
+   - [ ] Resend account is active
+   - [ ] Domain is added to Resend
+   - [ ] Domain shows "Verified" status in Resend dashboard
+   - [ ] API key is valid and not expired
+   - [ ] FROM_EMAIL matches the verified domain
 
-- Verify your Supabase project is active (not paused)
-- Check that the `customers` table exists in your database
-- Verify the RLS policy is set up correctly
+3. **DNS Records**
+   - [ ] TXT record for domain verification is added
+   - [ ] DKIM record is added
+   - [ ] SPF record includes Resend
+   - [ ] DNS records have propagated (check with whatsmydns.net)
 
-### Data not syncing
+4. **Edge Function**
+   - [ ] Edge Function is deployed (check Supabase dashboard)
+   - [ ] Edge Function logs show no errors
+   - [ ] Test invocation from dashboard works
+   - [ ] Function returns 200 status code
 
-- Check your internet connection
-- Look at the console logs for error messages
-- Verify your API keys are correct
+5. **App Configuration**
+   - [ ] EXPO_PUBLIC_SUPABASE_URL is set in .env
+   - [ ] EXPO_PUBLIC_SUPABASE_ANON_KEY is set in .env
+   - [ ] Development server was restarted after adding .env
+   - [ ] App shows "Cloud Storage Active" banner
 
-### Email sending fails
+## Getting Help
 
-- Verify the Edge Function is deployed (check Supabase dashboard)
-- Check that your email API key is set correctly in Supabase secrets
-- Look at Edge Function logs in Supabase dashboard for error details
-- Ensure your email service account is active and has sending quota
-- Verify FROM_EMAIL matches your verified domain
-- Check DNS records are properly configured
+If you're still having issues:
 
-### Checking Edge Function Logs
-
-To see detailed logs:
-1. Go to Supabase dashboard
-2. Navigate to **Edge Functions**
-3. Click on `send-reminder-email`
-4. Click **Logs** tab
-5. Look for error messages or API responses
+1. **Check Edge Function Logs**: Go to Supabase dashboard → Edge Functions → send-reminder-email → Logs
+2. **Look for specific error messages**: The logs will tell you exactly what's wrong
+3. **Common error messages**:
+   - "RESEND_API_KEY is not configured" → Add the secret to Supabase
+   - "Domain not verified" → Verify your domain in Resend
+   - "Invalid API key" → Check your Resend API key
+   - "Missing required fields" → Update the app code
 
 ## Security Notes
 
@@ -369,8 +411,6 @@ CREATE POLICY "Users can delete their own customers" ON customers
 For more information:
 
 - [Supabase Documentation](https://supabase.com/docs)
-- [Supabase JavaScript Client](https://supabase.com/docs/reference/javascript/introduction)
-- [Row Level Security Guide](https://supabase.com/docs/guides/auth/row-level-security)
 - [Supabase Edge Functions](https://supabase.com/docs/guides/functions)
 - [Resend Documentation](https://resend.com/docs)
-- [SendGrid Documentation](https://docs.sendgrid.com/)
+- [Resend Domain Verification](https://resend.com/docs/dashboard/domains/introduction)
