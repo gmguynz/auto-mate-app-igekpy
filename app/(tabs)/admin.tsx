@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -10,6 +10,7 @@ import {
   TextInput,
   ActivityIndicator,
   Modal,
+  RefreshControl,
 } from 'react-native';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
@@ -32,6 +33,7 @@ export default function AdminScreen() {
   const router = useRouter();
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [editingUser, setEditingUser] = useState<UserProfile | null>(null);
@@ -52,13 +54,21 @@ export default function AdminScreen() {
     loadUsers();
   }, [isAdmin]);
 
-  const loadUsers = async () => {
+  const loadUsers = async (showLoader = true) => {
     try {
-      setLoading(true);
+      if (showLoader) {
+        setLoading(true);
+      }
+      console.log('Loading users...');
+      const startTime = Date.now();
+      
       const { data, error } = await supabase
         .from('user_profiles')
-        .select('*')
+        .select('id, email, full_name, user_id, role, created_at, updated_at')
         .order('created_at', { ascending: false });
+
+      const endTime = Date.now();
+      console.log(`Loaded ${data?.length || 0} users in ${endTime - startTime}ms`);
 
       if (error) {
         console.error('Error loading users:', error);
@@ -72,8 +82,14 @@ export default function AdminScreen() {
       Alert.alert('Error', 'Failed to load users');
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   };
+
+  const onRefresh = useCallback(() => {
+    setRefreshing(true);
+    loadUsers(false);
+  }, []);
 
   const handleCreateUser = async () => {
     if (!newUserEmail || !newUserPassword || !newUserFullName) {
@@ -142,7 +158,7 @@ export default function AdminScreen() {
               setNewUserFullName('');
               setNewUserId('');
               setNewUserRole('user');
-              loadUsers();
+              loadUsers(false);
             },
           },
         ]
@@ -206,7 +222,7 @@ export default function AdminScreen() {
               setNewUserFullName('');
               setNewUserId('');
               setNewUserRole('user');
-              loadUsers();
+              loadUsers(false);
             },
           },
         ]
@@ -285,7 +301,7 @@ export default function AdminScreen() {
               }
 
               Alert.alert('Success', 'User deleted successfully');
-              loadUsers();
+              loadUsers(false);
             } catch (error) {
               console.error('Error deleting user:', error);
               Alert.alert('Error', 'Failed to delete user');
@@ -328,7 +344,7 @@ export default function AdminScreen() {
                 'Success', 
                 'Role updated successfully. The user will need to log out and log back in for the changes to take effect.'
               );
-              loadUsers();
+              loadUsers(false);
             } catch (error) {
               console.error('Error updating role:', error);
               Alert.alert('Error', 'Failed to update role');
@@ -360,6 +376,14 @@ export default function AdminScreen() {
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor={colors.primary}
+            colors={[colors.primary]}
+          />
+        }
       >
         <View style={styles.header}>
           <Text style={styles.title}>User Management</Text>

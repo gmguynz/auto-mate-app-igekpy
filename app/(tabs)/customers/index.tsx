@@ -8,6 +8,8 @@ import {
   TouchableOpacity,
   TextInput,
   Alert,
+  ActivityIndicator,
+  RefreshControl,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { colors } from '@/styles/commonStyles';
@@ -22,12 +24,34 @@ export default function CustomersScreen() {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [filteredCustomers, setFilteredCustomers] = useState<Customer[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
 
-  const loadCustomers = async () => {
-    const data = await storageUtils.getCustomers();
-    setCustomers(data);
-    setFilteredCustomers(data);
+  const loadCustomers = async (showLoader = true) => {
+    try {
+      if (showLoader) {
+        setLoading(true);
+      }
+      console.log('Loading customers...');
+      const startTime = Date.now();
+      const data = await storageUtils.getCustomers();
+      const endTime = Date.now();
+      console.log(`Loaded ${data.length} customers in ${endTime - startTime}ms`);
+      setCustomers(data);
+      setFilteredCustomers(data);
+    } catch (error) {
+      console.error('Error loading customers:', error);
+      Alert.alert('Error', 'Failed to load customers. Please try again.');
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
   };
+
+  const onRefresh = useCallback(() => {
+    setRefreshing(true);
+    loadCustomers(false);
+  }, []);
 
   useFocusEffect(
     useCallback(() => {
@@ -69,8 +93,13 @@ export default function CustomersScreen() {
           text: 'Delete',
           style: 'destructive',
           onPress: async () => {
-            await storageUtils.deleteCustomer(customerId);
-            loadCustomers();
+            try {
+              await storageUtils.deleteCustomer(customerId);
+              await loadCustomers(false);
+            } catch (error) {
+              console.error('Error deleting customer:', error);
+              Alert.alert('Error', 'Failed to delete customer. Please try again.');
+            }
           },
         },
       ]
@@ -108,6 +137,36 @@ export default function CustomersScreen() {
     }
     return `${customer.firstName} ${customer.lastName}`.trim();
   };
+
+  if (loading) {
+    return (
+      <View style={styles.container}>
+        <View style={styles.header}>
+          <View style={styles.headerTop}>
+            <View>
+              <Text style={styles.title}>Customer Database</Text>
+              <Text style={styles.subtitle}>Loading...</Text>
+            </View>
+            <TouchableOpacity
+              style={styles.remindersButton}
+              onPress={() => router.push('/customers/reminders')}
+            >
+              <IconSymbol
+                ios_icon_name="bell.fill"
+                android_material_icon_name="notifications"
+                size={24}
+                color={colors.primary}
+              />
+            </TouchableOpacity>
+          </View>
+        </View>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={colors.primary} />
+          <Text style={styles.loadingText}>Loading customers...</Text>
+        </View>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
@@ -164,6 +223,14 @@ export default function CustomersScreen() {
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor={colors.primary}
+            colors={[colors.primary]}
+          />
+        }
       >
         {filteredCustomers.length === 0 ? (
           <View style={styles.emptyState}>
@@ -387,6 +454,16 @@ const styles = StyleSheet.create({
   scrollContent: {
     padding: 20,
     paddingBottom: 100,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    marginTop: 12,
+    fontSize: 16,
+    color: colors.textSecondary,
   },
   emptyState: {
     alignItems: 'center',
