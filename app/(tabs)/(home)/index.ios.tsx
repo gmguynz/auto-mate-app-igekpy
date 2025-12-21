@@ -169,7 +169,7 @@ export default function HomeScreen() {
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.header}>
-          <Text style={styles.title}>Mechanic Database</Text>
+          <Text style={styles.title}>Charlies Workshop</Text>
           <Text style={styles.subtitle}>Customer & Vehicle Management</Text>
         </View>
 
@@ -345,7 +345,7 @@ export default function HomeScreen() {
             </View>
             <View style={styles.featureItem}>
               <Text style={styles.featureBullet}>•</Text>
-              <Text style={styles.featureText}>Track inspection and service due dates</Text>
+              <Text style={styles.featureText}>Track WOF inspection and service due dates</Text>
             </View>
             <View style={styles.featureItem}>
               <Text style={styles.featureBullet}>•</Text>

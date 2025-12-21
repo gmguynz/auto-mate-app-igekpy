@@ -252,87 +252,89 @@ export default function CustomerDetailScreen() {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Customer Information</Text>
 
-          <Text style={styles.label}>First Name</Text>
-          {isEditing ? (
-            <TextInput
-              style={styles.input}
-              value={editedCustomer.firstName}
-              onChangeText={(text) => updateField('firstName', text)}
-            />
-          ) : (
-            <Text style={styles.value}>{customer.firstName || 'Not provided'}</Text>
-          )}
+          <View style={styles.infoCard}>
+            <Text style={styles.label}>First Name</Text>
+            {isEditing ? (
+              <TextInput
+                style={styles.input}
+                value={editedCustomer.firstName}
+                onChangeText={(text) => updateField('firstName', text)}
+              />
+            ) : (
+              <Text style={styles.value}>{customer.firstName || 'Not provided'}</Text>
+            )}
 
-          <Text style={styles.label}>Last Name</Text>
-          {isEditing ? (
-            <TextInput
-              style={styles.input}
-              value={editedCustomer.lastName}
-              onChangeText={(text) => updateField('lastName', text)}
-            />
-          ) : (
-            <Text style={styles.value}>{customer.lastName || 'Not provided'}</Text>
-          )}
+            <Text style={styles.label}>Last Name</Text>
+            {isEditing ? (
+              <TextInput
+                style={styles.input}
+                value={editedCustomer.lastName}
+                onChangeText={(text) => updateField('lastName', text)}
+              />
+            ) : (
+              <Text style={styles.value}>{customer.lastName || 'Not provided'}</Text>
+            )}
 
-          <Text style={styles.label}>Company Name</Text>
-          {isEditing ? (
-            <TextInput
-              style={styles.input}
-              value={editedCustomer.companyName}
-              onChangeText={(text) => updateField('companyName', text)}
-            />
-          ) : (
-            <Text style={styles.value}>{customer.companyName || 'Not provided'}</Text>
-          )}
+            <Text style={styles.label}>Company Name</Text>
+            {isEditing ? (
+              <TextInput
+                style={styles.input}
+                value={editedCustomer.companyName}
+                onChangeText={(text) => updateField('companyName', text)}
+              />
+            ) : (
+              <Text style={styles.value}>{customer.companyName || 'Not provided'}</Text>
+            )}
 
-          <Text style={styles.label}>Address</Text>
-          {isEditing ? (
-            <TextInput
-              style={styles.input}
-              value={editedCustomer.address}
-              onChangeText={(text) => updateField('address', text)}
-              multiline
-            />
-          ) : (
-            <Text style={styles.value}>{customer.address || 'Not provided'}</Text>
-          )}
+            <Text style={styles.label}>Address</Text>
+            {isEditing ? (
+              <TextInput
+                style={styles.input}
+                value={editedCustomer.address}
+                onChangeText={(text) => updateField('address', text)}
+                multiline
+              />
+            ) : (
+              <Text style={styles.value}>{customer.address || 'Not provided'}</Text>
+            )}
 
-          <Text style={styles.label}>Email</Text>
-          {isEditing ? (
-            <TextInput
-              style={styles.input}
-              value={editedCustomer.email}
-              onChangeText={(text) => updateField('email', text)}
-              keyboardType="email-address"
-              autoCapitalize="none"
-            />
-          ) : (
-            <Text style={styles.value}>{customer.email}</Text>
-          )}
+            <Text style={styles.label}>Email</Text>
+            {isEditing ? (
+              <TextInput
+                style={styles.input}
+                value={editedCustomer.email}
+                onChangeText={(text) => updateField('email', text)}
+                keyboardType="email-address"
+                autoCapitalize="none"
+              />
+            ) : (
+              <Text style={styles.value}>{customer.email}</Text>
+            )}
 
-          <Text style={styles.label}>Phone Number</Text>
-          {isEditing ? (
-            <TextInput
-              style={styles.input}
-              value={editedCustomer.phone}
-              onChangeText={(text) => updateField('phone', text)}
-              keyboardType="phone-pad"
-            />
-          ) : (
-            <Text style={styles.value}>{customer.phone || 'Not provided'}</Text>
-          )}
+            <Text style={styles.label}>Phone Number</Text>
+            {isEditing ? (
+              <TextInput
+                style={styles.input}
+                value={editedCustomer.phone}
+                onChangeText={(text) => updateField('phone', text)}
+                keyboardType="phone-pad"
+              />
+            ) : (
+              <Text style={styles.value}>{customer.phone || 'Not provided'}</Text>
+            )}
 
-          <Text style={styles.label}>Mobile Number</Text>
-          {isEditing ? (
-            <TextInput
-              style={styles.input}
-              value={editedCustomer.mobile}
-              onChangeText={(text) => updateField('mobile', text)}
-              keyboardType="phone-pad"
-            />
-          ) : (
-            <Text style={styles.value}>{customer.mobile || 'Not provided'}</Text>
-          )}
+            <Text style={styles.label}>Mobile Number</Text>
+            {isEditing ? (
+              <TextInput
+                style={styles.input}
+                value={editedCustomer.mobile}
+                onChangeText={(text) => updateField('mobile', text)}
+                keyboardType="phone-pad"
+              />
+            ) : (
+              <Text style={styles.value}>{customer.mobile || 'Not provided'}</Text>
+            )}
+          </View>
         </View>
 
         <View style={styles.section}>
@@ -416,7 +418,7 @@ export default function CustomerDetailScreen() {
                     <Text style={styles.value}>{vehicle.year}</Text>
                   )}
 
-                  <Text style={styles.label}>Inspection Due Date</Text>
+                  <Text style={styles.label}>WOF Inspection Due Date</Text>
                   {isEditing ? (
                     <TouchableOpacity
                       style={styles.dateButton}
@@ -601,6 +603,13 @@ const styles = StyleSheet.create({
     color: colors.text,
     marginBottom: 16,
   },
+  infoCard: {
+    backgroundColor: colors.card,
+    borderRadius: 12,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
   label: {
     fontSize: 14,
     fontWeight: '600',
@@ -614,7 +623,7 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   input: {
-    backgroundColor: colors.card,
+    backgroundColor: colors.background,
     borderWidth: 1,
     borderColor: colors.border,
     borderRadius: 8,
@@ -648,7 +657,7 @@ const styles = StyleSheet.create({
   dateButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.card,
+    backgroundColor: colors.background,
     borderWidth: 1,
     borderColor: colors.border,
     borderRadius: 8,
