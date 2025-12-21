@@ -11,6 +11,7 @@ import {
   Platform,
   Modal,
   ActivityIndicator,
+  KeyboardAvoidingView,
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import DateTimePicker from '@react-native-community/datetimepicker';
@@ -700,7 +701,10 @@ export default function CustomerDetailScreen() {
         transparent={true}
         onRequestClose={() => setShowTransferModal(false)}
       >
-        <View style={styles.modalOverlay}>
+        <KeyboardAvoidingView 
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={styles.modalOverlay}
+        >
           <View style={styles.transferModalContent}>
             <View style={styles.transferModalHeader}>
               <Text style={styles.modalTitle}>Transfer Vehicle</Text>
@@ -761,7 +765,10 @@ export default function CustomerDetailScreen() {
                 )}
               </View>
 
-              <ScrollView style={styles.customerList}>
+              <ScrollView 
+                style={styles.customerList}
+                contentContainerStyle={styles.customerListContent}
+              >
                 {getFilteredCustomers().map((cust, index) => (
                   <React.Fragment key={index}>
                     <TouchableOpacity
@@ -791,26 +798,28 @@ export default function CustomerDetailScreen() {
                 ))}
               </ScrollView>
 
-              <TouchableOpacity
-                style={[
-                  styles.transferConfirmButton,
-                  (!selectedNewOwner || transferring) && styles.transferConfirmButtonDisabled,
-                ]}
-                onPress={confirmTransferVehicle}
-                disabled={!selectedNewOwner || transferring}
-                activeOpacity={0.7}
-              >
-                {transferring ? (
-                  <ActivityIndicator color="#FFFFFF" />
-                ) : (
-                  <Text style={styles.transferConfirmButtonText}>
-                    Transfer Vehicle
-                  </Text>
-                )}
-              </TouchableOpacity>
+              <View style={styles.transferButtonContainer}>
+                <TouchableOpacity
+                  style={[
+                    styles.transferConfirmButton,
+                    (!selectedNewOwner || transferring) && styles.transferConfirmButtonDisabled,
+                  ]}
+                  onPress={confirmTransferVehicle}
+                  disabled={!selectedNewOwner || transferring}
+                  activeOpacity={0.7}
+                >
+                  {transferring ? (
+                    <ActivityIndicator color="#FFFFFF" />
+                  ) : (
+                    <Text style={styles.transferConfirmButtonText}>
+                      Transfer Vehicle
+                    </Text>
+                  )}
+                </TouchableOpacity>
+              </View>
             </View>
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
     </View>
   );
@@ -1100,7 +1109,8 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background,
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
-    maxHeight: '80%',
+    maxHeight: '85%',
+    height: Platform.OS === 'ios' ? '85%' : 'auto',
     ...(Platform.OS === 'web' && {
       maxWidth: 600,
       alignSelf: 'center',
@@ -1112,12 +1122,14 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     padding: 20,
+    paddingTop: Platform.OS === 'ios' ? 24 : 20,
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
   },
   transferModalBody: {
-    padding: 20,
     flex: 1,
+    padding: 20,
+    paddingBottom: Platform.OS === 'ios' ? 40 : 20,
   },
   closeButton: {
     padding: 4,
@@ -1142,6 +1154,9 @@ const styles = StyleSheet.create({
   customerList: {
     flex: 1,
     marginBottom: 16,
+  },
+  customerListContent: {
+    paddingBottom: 20,
   },
   customerItem: {
     flexDirection: 'row',
@@ -1175,6 +1190,11 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: colors.textSecondary,
     userSelect: Platform.OS === 'web' ? 'none' : undefined,
+  },
+  transferButtonContainer: {
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
   },
   transferConfirmButton: {
     backgroundColor: colors.primary,

@@ -285,8 +285,12 @@ Charlie's Workshop`;
   };
 
   const handleSendReminder = (reminder: Reminder) => {
+    console.log('handleSendReminder called for:', reminder.vehicleReg);
     const hasEmail = reminder.customerEmail;
     const supabaseConfigured = isSupabaseConfigured();
+
+    console.log('Has email:', hasEmail);
+    console.log('Supabase configured:', supabaseConfigured);
 
     if (!hasEmail) {
       Alert.alert('Error', 'No email address available for this customer');
@@ -315,7 +319,10 @@ Charlie's Workshop`;
         { text: 'Cancel', style: 'cancel' },
         {
           text: 'Send Email',
-          onPress: () => sendAutomatedEmail(reminder),
+          onPress: () => {
+            console.log('User confirmed email send');
+            sendAutomatedEmail(reminder);
+          },
         },
       ]
     );
@@ -411,7 +418,10 @@ Charlie's Workshop`;
               <React.Fragment key={index}>
                 <TouchableOpacity
                   style={[styles.reminderCard, styles.overdueCard]}
-                  onPress={() => handleSendReminder(reminder)}
+                  onPress={() => {
+                    console.log('Reminder card pressed (overdue)');
+                    handleSendReminder(reminder);
+                  }}
                   activeOpacity={0.7}
                   disabled={sendingEmail === reminder.vehicleId}
                 >
@@ -462,7 +472,10 @@ Charlie's Workshop`;
               <React.Fragment key={index}>
                 <TouchableOpacity
                   style={styles.reminderCard}
-                  onPress={() => handleSendReminder(reminder)}
+                  onPress={() => {
+                    console.log('Reminder card pressed (upcoming)');
+                    handleSendReminder(reminder);
+                  }}
                   activeOpacity={0.7}
                   disabled={sendingEmail === reminder.vehicleId}
                 >

@@ -31,6 +31,23 @@ export const emailService = {
         };
       }
 
+      // Check if user is authenticated
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      
+      if (sessionError) {
+        console.error('Error getting session:', sessionError);
+      }
+      
+      if (!session) {
+        console.warn('No active session found - user may not be authenticated');
+        return {
+          success: false,
+          error: 'You must be logged in to send emails. Please log in and try again.',
+        };
+      }
+
+      console.log('User authenticated, session exists');
+
       // Convert plain text body to HTML with line breaks
       const htmlBody = emailData.body.replace(/\n/g, '<br>');
 
@@ -75,6 +92,8 @@ export const emailService = {
               errorMessage = 'Email domain not verified. Please verify your domain in Resend dashboard.';
             } else if (error.message?.includes('FROM_EMAIL')) {
               errorMessage = 'FROM_EMAIL not configured. Please add FROM_EMAIL to Supabase Edge Function secrets.';
+            } else if (error.message?.includes('JWT') || error.message?.includes('auth')) {
+              errorMessage = 'Authentication error. Please log out and log back in, then try again.';
             }
             
             return {
