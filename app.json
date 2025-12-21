@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "Charlies Workshop",
-    "slug": "Charlies Workshop",
+    "slug": "auto-mate-app-igekpy",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/natively-dark.png",
@@ -25,7 +25,7 @@
         "backgroundColor": "#000000"
       },
       "edgeToEdgeEnabled": true,
-      "package": "com.anonymous.Natively",
+      "package": "com.charliesworkshop.database",
       "permissions": [
         "android.permission.SCHEDULE_EXACT_ALARM",
         "android.permission.POST_NOTIFICATIONS"

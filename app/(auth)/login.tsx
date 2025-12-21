@@ -41,6 +41,12 @@ export default function LoginScreen() {
         console.log('Identifier is not an email, looking up user_id via Edge Function:', identifier);
         
         try {
+          // Get the Supabase URL and anon key for the Edge Function call
+          const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
+          const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
+
+          console.log('Calling Edge Function with URL:', supabaseUrl);
+
           const { data, error } = await supabase.functions.invoke('lookup-user-id', {
             body: { user_id: identifier }
           });
@@ -49,10 +55,19 @@ export default function LoginScreen() {
 
           if (error) {
             console.error('User ID lookup error:', error);
-            Alert.alert(
-              'Login Failed',
-              'Invalid user ID or password. Please check your user ID and try again.'
-            );
+            
+            // Check if it's a CORS or network error
+            if (error.message?.includes('CORS') || error.message?.includes('network')) {
+              Alert.alert(
+                'Connection Error',
+                'Unable to connect to the authentication service. Please check your internet connection and try again.'
+              );
+            } else {
+              Alert.alert(
+                'Login Failed',
+                'Invalid user ID or password. Please check your user ID and try again.'
+              );
+            }
             setLoading(false);
             return;
           }
@@ -69,12 +84,19 @@ export default function LoginScreen() {
 
           email = data.email;
           console.log('Found email for user_id:', email);
-        } catch (lookupError) {
+        } catch (lookupError: any) {
           console.error('Exception during user ID lookup:', lookupError);
-          Alert.alert(
-            'Login Failed',
-            'Unable to verify user ID. Please try again or use your email address.'
-          );
+          
+          // Provide more specific error messages based on the error type
+          let errorMessage = 'Unable to verify user ID. Please try again or use your email address.';
+          
+          if (lookupError.message?.includes('Failed to fetch') || 
+              lookupError.message?.includes('NetworkError') ||
+              lookupError.message?.includes('CORS')) {
+            errorMessage = 'Network error. Please check your internet connection and try again.';
+          }
+          
+          Alert.alert('Login Failed', errorMessage);
           setLoading(false);
           return;
         }
@@ -93,6 +115,8 @@ export default function LoginScreen() {
           errorMessage = 'Invalid password. Please check your password and try again.';
         } else if (error.message?.includes('Email not confirmed')) {
           errorMessage = 'Please verify your email address before logging in.';
+        } else if (error.message?.includes('network') || error.message?.includes('fetch')) {
+          errorMessage = 'Network error. Please check your internet connection and try again.';
         }
         
         Alert.alert('Login Failed', errorMessage);
@@ -100,9 +124,16 @@ export default function LoginScreen() {
         console.log('Login successful');
         router.replace('/(tabs)');
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Login error:', error);
-      Alert.alert('Error', 'An unexpected error occurred. Please try again.');
+      
+      let errorMessage = 'An unexpected error occurred. Please try again.';
+      
+      if (error.message?.includes('network') || error.message?.includes('fetch')) {
+        errorMessage = 'Network error. Please check your internet connection and try again.';
+      }
+      
+      Alert.alert('Error', errorMessage);
     } finally {
       setLoading(false);
     }
