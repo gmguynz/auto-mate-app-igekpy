@@ -45,11 +45,13 @@ export default function LoginScreen() {
             body: { user_id: identifier }
           });
 
+          console.log('Edge Function response:', { data, error });
+
           if (error) {
             console.error('User ID lookup error:', error);
             Alert.alert(
               'Login Failed',
-              'Invalid user ID or password. Please try again.'
+              'Invalid user ID or password. Please check your user ID and try again.'
             );
             setLoading(false);
             return;
@@ -59,7 +61,7 @@ export default function LoginScreen() {
             console.error('No email found for user_id:', identifier);
             Alert.alert(
               'Login Failed',
-              'Invalid user ID or password. Please try again.'
+              'User ID not found. Please check your user ID or contact your administrator.'
             );
             setLoading(false);
             return;
@@ -78,14 +80,22 @@ export default function LoginScreen() {
         }
       }
 
+      console.log('Attempting to sign in with email:', email);
       const { error } = await signIn(email, password);
 
       if (error) {
         console.error('Login error:', error);
-        Alert.alert(
-          'Login Failed',
-          error.message || 'Invalid email/user ID or password. Please try again.'
-        );
+        
+        // Provide more specific error messages
+        let errorMessage = 'Invalid email/user ID or password. Please try again.';
+        
+        if (error.message?.includes('Invalid login credentials')) {
+          errorMessage = 'Invalid password. Please check your password and try again.';
+        } else if (error.message?.includes('Email not confirmed')) {
+          errorMessage = 'Please verify your email address before logging in.';
+        }
+        
+        Alert.alert('Login Failed', errorMessage);
       } else {
         console.log('Login successful');
         router.replace('/(tabs)');
@@ -199,7 +209,7 @@ export default function LoginScreen() {
               color={colors.primary}
             />
             <Text style={styles.infoText}>
-              User accounts must be created by an administrator. Contact your admin if you need access. You can log in using either your email address or custom user ID.
+              User accounts must be created by an administrator. Contact your admin if you need access. You can log in using either your email address or custom user ID (case-insensitive).
             </Text>
           </View>
         </View>
