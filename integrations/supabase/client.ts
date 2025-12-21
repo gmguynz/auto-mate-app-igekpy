@@ -1,11 +1,11 @@
 
 import { createClient } from '@supabase/supabase-js';
 import 'react-native-url-polyfill/auto';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL || '';
 const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || '';
 
-// Check if Supabase is configured
 export const isSupabaseConfigured = () => {
   const hasUrl = supabaseUrl !== '' && supabaseUrl !== 'undefined' && supabaseUrl.startsWith('https://');
   const hasKey = supabaseAnonKey !== '' && supabaseAnonKey !== 'undefined' && supabaseAnonKey.length > 20;
@@ -25,7 +25,6 @@ export const isSupabaseConfigured = () => {
   return configured;
 };
 
-// Create a placeholder client for when Supabase is not configured
 const createPlaceholderClient = () => {
   try {
     return createClient('https://placeholder.supabase.co', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBsYWNlaG9sZGVyIiwicm9sZSI6ImFub24iLCJpYXQiOjE2NDUxOTI4MDAsImV4cCI6MTk2MDc2ODgwMH0.placeholder', {
@@ -41,16 +40,16 @@ const createPlaceholderClient = () => {
   }
 };
 
-// Only create client if properly configured
 let supabaseClient: ReturnType<typeof createClient> | null = null;
 
 try {
   if (isSupabaseConfigured()) {
-    console.log('Initializing Supabase client...');
+    console.log('Initializing Supabase client with auth...');
     supabaseClient = createClient(supabaseUrl, supabaseAnonKey, {
       auth: {
+        storage: AsyncStorage,
         autoRefreshToken: true,
-        persistSession: false,
+        persistSession: true,
         detectSessionInUrl: false,
       },
     });

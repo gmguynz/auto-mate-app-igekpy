@@ -1,13 +1,14 @@
 
-import { useEffect } from 'react';
-import { Stack } from 'expo-router';
+import { useEffect, useState } from 'react';
+import { Stack, useRouter, useSegments } from 'expo-router';
 import { useFonts } from 'expo-font';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { notificationService } from '@/utils/notificationService';
 import { ErrorBoundary } from 'react-error-boundary';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { colors } from '@/styles/commonStyles';
+import { AuthProvider, useAuth } from '@/contexts/AuthContext';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -20,6 +21,52 @@ function ErrorFallback({ error, resetErrorBoundary }: any) {
         <Text style={styles.errorButtonText}>Try Again</Text>
       </TouchableOpacity>
     </View>
+  );
+}
+
+function RootLayoutNav() {
+  const { user, loading } = useAuth();
+  const segments = useSegments();
+  const router = useRouter();
+  const [isNavigationReady, setIsNavigationReady] = useState(false);
+
+  useEffect(() => {
+    if (loading) return;
+
+    const inAuthGroup = segments[0] === '(auth)';
+
+    if (!user && !inAuthGroup) {
+      router.replace('/(auth)/login');
+    } else if (user && inAuthGroup) {
+      router.replace('/(tabs)');
+    }
+
+    setIsNavigationReady(true);
+  }, [user, loading, segments]);
+
+  if (loading || !isNavigationReady) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color={colors.primary} />
+        <Text style={styles.loadingText}>Loading...</Text>
+      </View>
+    );
+  }
+
+  return (
+    <Stack screenOptions={{ headerShown: false }}>
+      <Stack.Screen name="(auth)" options={{ headerShown: false }} />
+      <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+      <Stack.Screen name="modal" options={{ presentation: 'modal' }} />
+      <Stack.Screen name="formsheet" options={{ presentation: 'formSheet' }} />
+      <Stack.Screen
+        name="transparent-modal"
+        options={{
+          presentation: 'transparentModal',
+          animation: 'fade',
+        }}
+      />
+    </Stack>
   );
 }
 
@@ -40,7 +87,6 @@ export default function RootLayout() {
     }
   }, [loaded]);
 
-  // Initialize notifications when app starts
   useEffect(() => {
     const initializeNotifications = async () => {
       try {
@@ -72,24 +118,26 @@ export default function RootLayout() {
 
   return (
     <ErrorBoundary FallbackComponent={ErrorFallback} onReset={() => console.log('Error boundary reset')}>
-      <StatusBar style="auto" />
-      <Stack screenOptions={{ headerShown: false }}>
-        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        <Stack.Screen name="modal" options={{ presentation: 'modal' }} />
-        <Stack.Screen name="formsheet" options={{ presentation: 'formSheet' }} />
-        <Stack.Screen
-          name="transparent-modal"
-          options={{
-            presentation: 'transparentModal',
-            animation: 'fade',
-          }}
-        />
-      </Stack>
+      <AuthProvider>
+        <StatusBar style="auto" />
+        <RootLayoutNav />
+      </AuthProvider>
     </ErrorBoundary>
   );
 }
 
 const styles = StyleSheet.create({
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: colors.background,
+  },
+  loadingText: {
+    marginTop: 12,
+    fontSize: 16,
+    color: colors.textSecondary,
+  },
   errorContainer: {
     flex: 1,
     justifyContent: 'center',

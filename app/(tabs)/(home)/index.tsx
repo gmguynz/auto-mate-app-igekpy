@@ -8,9 +8,11 @@ import { storageUtils } from '@/utils/storage';
 import { SupabaseSetupGuide } from '@/components/SupabaseSetupGuide';
 import { dateUtils } from '@/utils/dateUtils';
 import { Customer } from '@/types/customer';
+import { useAuth } from '@/contexts/AuthContext';
 
 export default function HomeScreen() {
   const router = useRouter();
+  const { user, profile, isAdmin } = useAuth();
   const [showSetupGuide, setShowSetupGuide] = useState(false);
   const [isSupabaseConfigured, setIsSupabaseConfigured] = useState(false);
   const [customerCount, setCustomerCount] = useState(0);
@@ -57,14 +59,12 @@ export default function HomeScreen() {
       const customers = await storageUtils.getCustomers();
       setCustomerCount(customers.length);
       
-      // Count total vehicles
       let totalVehicles = 0;
       customers.forEach((customer) => {
         totalVehicles += customer.vehicles.length;
       });
       setVehicleCount(totalVehicles);
 
-      // Count reminders in next 14 days
       const reminders = getUpcomingReminders(customers);
       setReminderCount(reminders);
       
@@ -90,16 +90,14 @@ export default function HomeScreen() {
         const inspectionDate = vehicle.inspectionDueDate ? new Date(vehicle.inspectionDueDate) : null;
         const serviceDate = vehicle.serviceDueDate ? new Date(vehicle.serviceDueDate) : null;
 
-        // Check if inspection is within 14 days
         if (inspectionDate && inspectionDate <= fourteenDaysFromNow) {
-          // Check if service is on the same day (merged reminder)
           if (serviceDate && serviceDate.getTime() === inspectionDate.getTime()) {
-            count++; // Count as one merged reminder
+            count++;
           } else {
-            count++; // Count inspection separately
+            count++;
           }
         } else if (serviceDate && serviceDate <= fourteenDaysFromNow) {
-          count++; // Count service separately (inspection not within 14 days)
+          count++;
         }
       });
     });
@@ -171,6 +169,24 @@ export default function HomeScreen() {
         <View style={styles.header}>
           <Text style={styles.title}>Mechanic Database</Text>
           <Text style={styles.subtitle}>Customer & Vehicle Management</Text>
+          {user && (
+            <View style={styles.userBadge}>
+              <IconSymbol
+                ios_icon_name="person.fill"
+                android_material_icon_name="person"
+                size={16}
+                color={colors.primary}
+              />
+              <Text style={styles.userBadgeText}>
+                {profile?.full_name || user.email}
+              </Text>
+              {isAdmin && (
+                <View style={styles.adminBadge}>
+                  <Text style={styles.adminBadgeText}>ADMIN</Text>
+                </View>
+              )}
+            </View>
+          )}
         </View>
 
         <View style={styles.actionsContainer}>
@@ -341,6 +357,10 @@ export default function HomeScreen() {
           <View style={styles.featureList}>
             <View style={styles.featureItem}>
               <Text style={styles.featureBullet}>•</Text>
+              <Text style={styles.featureText}>Secure user authentication and access control</Text>
+            </View>
+            <View style={styles.featureItem}>
+              <Text style={styles.featureBullet}>•</Text>
               <Text style={styles.featureText}>Store customer and vehicle information</Text>
             </View>
             <View style={styles.featureItem}>
@@ -357,10 +377,28 @@ export default function HomeScreen() {
             </View>
             <View style={styles.featureItem}>
               <Text style={styles.featureBullet}>•</Text>
-              <Text style={styles.featureText}>Cloud storage with Supabase (optional)</Text>
+              <Text style={styles.featureText}>Cloud storage with Supabase</Text>
             </View>
           </View>
         </View>
+
+        {isSupabaseConfigured && (
+          <View style={styles.successCard}>
+            <IconSymbol
+              ios_icon_name="checkmark.shield.fill"
+              android_material_icon_name="verified-user"
+              size={32}
+              color="#4CAF50"
+            />
+            <View style={styles.successContent}>
+              <Text style={styles.successTitle}>Secure & Protected</Text>
+              <Text style={styles.successText}>
+                Your data is securely stored in Supabase with user authentication enabled. 
+                Only authorized users can access the database. Automated email reminders are sent 14 days before due dates via Resend.
+              </Text>
+            </View>
+          </View>
+        )}
 
         {!isSupabaseConfigured && (
           <TouchableOpacity
@@ -376,7 +414,7 @@ export default function HomeScreen() {
             <View style={styles.warningContent}>
               <Text style={styles.warningTitle}>Using Local Storage</Text>
               <Text style={styles.warningText}>
-                Your data is stored locally on this device only. Tap here to set up cloud storage with Supabase for multi-device access.
+                Your data is stored locally on this device only. Tap here to set up cloud storage with Supabase for multi-device access and user authentication.
               </Text>
             </View>
             <IconSymbol
@@ -386,23 +424,6 @@ export default function HomeScreen() {
               color={colors.textSecondary}
             />
           </TouchableOpacity>
-        )}
-
-        {isSupabaseConfigured && (
-          <View style={styles.successCard}>
-            <IconSymbol
-              ios_icon_name="checkmark.circle.fill"
-              android_material_icon_name="check-circle"
-              size={32}
-              color="#4CAF50"
-            />
-            <View style={styles.successContent}>
-              <Text style={styles.successTitle}>Cloud Storage Active</Text>
-              <Text style={styles.successText}>
-                Your data is securely stored in Supabase and accessible from any device. Automated email reminders are sent 14 days before due dates via Resend.
-              </Text>
-            </View>
-          </View>
         )}
       </ScrollView>
     </View>
@@ -473,6 +494,34 @@ const styles = StyleSheet.create({
   subtitle: {
     fontSize: 16,
     color: colors.textSecondary,
+    marginBottom: 12,
+  },
+  userBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.highlight,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    alignSelf: 'flex-start',
+    gap: 6,
+  },
+  userBadgeText: {
+    fontSize: 14,
+    color: colors.text,
+    fontWeight: '500',
+  },
+  adminBadge: {
+    backgroundColor: colors.primary,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 8,
+    marginLeft: 4,
+  },
+  adminBadgeText: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: '#FFFFFF',
   },
   actionsContainer: {
     marginBottom: 24,
