@@ -71,7 +71,7 @@ export default function LoginScreen() {
               color={colors.primary}
             />
           </View>
-          <Text style={styles.title}>Mechanic Database</Text>
+          <Text style={styles.title}>Charlies Workshop</Text>
           <Text style={styles.subtitle}>Sign in to continue</Text>
         </View>
 
