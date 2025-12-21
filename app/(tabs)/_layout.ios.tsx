@@ -23,10 +23,12 @@ export default function TabLayout() {
         <Icon sf="person.2.fill" />
         <Label>Customers</Label>
       </NativeTabs.Trigger>
-      <NativeTabs.Trigger name="admin" hidden={!isAdmin}>
-        <Icon sf="shield.fill" />
-        <Label>Admin</Label>
-      </NativeTabs.Trigger>
+      {!isAdmin ? null : (
+        <NativeTabs.Trigger name="admin">
+          <Icon sf="shield.fill" />
+          <Label>Admin</Label>
+        </NativeTabs.Trigger>
+      )}
       <NativeTabs.Trigger name="profile">
         <Icon sf="person.circle.fill" />
         <Label>Profile</Label>
