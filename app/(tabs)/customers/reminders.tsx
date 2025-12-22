@@ -11,6 +11,7 @@ import {
   RefreshControl,
   ActivityIndicator,
   Platform,
+  Pressable,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { colors } from '@/styles/commonStyles';
@@ -369,14 +370,23 @@ Charlie's Workshop`;
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backButton} activeOpacity={0.7}>
+        <Pressable 
+          onPress={() => {
+            console.log('Back button pressed');
+            router.back();
+          }} 
+          style={({ pressed }) => [
+            styles.backButton,
+            pressed && styles.buttonPressed,
+          ]}
+        >
           <IconSymbol
             ios_icon_name="chevron.left"
             android_material_icon_name="arrow-back"
             size={24}
             color={colors.text}
           />
-        </TouchableOpacity>
+        </Pressable>
         <Text style={styles.title}>Reminders</Text>
         <View style={{ width: 40 }} />
       </View>
@@ -452,14 +462,20 @@ Charlie's Workshop`;
               Overdue ({overdueReminders.length})
             </Text>
             {overdueReminders.map((reminder, index) => (
-              <React.Fragment key={index}>
-                <TouchableOpacity
-                  style={[styles.reminderCard, styles.overdueCard]}
+              <React.Fragment key={`overdue-${index}`}>
+                <Pressable
+                  style={({ pressed }) => [
+                    styles.reminderCard,
+                    styles.overdueCard,
+                    pressed && styles.cardPressed,
+                    sendingEmail === reminder.vehicleId && styles.cardDisabled,
+                  ]}
                   onPress={() => {
                     console.log('Reminder card pressed (overdue):', reminder.vehicleReg);
-                    handleSendReminder(reminder);
+                    if (sendingEmail !== reminder.vehicleId) {
+                      handleSendReminder(reminder);
+                    }
                   }}
-                  activeOpacity={0.7}
                   disabled={sendingEmail === reminder.vehicleId}
                 >
                   <View style={styles.reminderHeader}>
@@ -494,7 +510,7 @@ Charlie's Workshop`;
                       />
                     )}
                   </View>
-                </TouchableOpacity>
+                </Pressable>
               </React.Fragment>
             ))}
           </View>
@@ -506,14 +522,19 @@ Charlie's Workshop`;
               Upcoming ({upcomingReminders.length})
             </Text>
             {upcomingReminders.map((reminder, index) => (
-              <React.Fragment key={index}>
-                <TouchableOpacity
-                  style={styles.reminderCard}
+              <React.Fragment key={`upcoming-${index}`}>
+                <Pressable
+                  style={({ pressed }) => [
+                    styles.reminderCard,
+                    pressed && styles.cardPressed,
+                    sendingEmail === reminder.vehicleId && styles.cardDisabled,
+                  ]}
                   onPress={() => {
                     console.log('Reminder card pressed (upcoming):', reminder.vehicleReg);
-                    handleSendReminder(reminder);
+                    if (sendingEmail !== reminder.vehicleId) {
+                      handleSendReminder(reminder);
+                    }
                   }}
-                  activeOpacity={0.7}
                   disabled={sendingEmail === reminder.vehicleId}
                 >
                   <View style={styles.reminderHeader}>
@@ -548,7 +569,7 @@ Charlie's Workshop`;
                       />
                     )}
                   </View>
-                </TouchableOpacity>
+                </Pressable>
               </React.Fragment>
             ))}
           </View>
@@ -593,8 +614,15 @@ const styles = StyleSheet.create({
   },
   backButton: {
     padding: 8,
-    cursor: Platform.OS === 'web' ? 'pointer' : undefined,
-    userSelect: Platform.OS === 'web' ? 'none' : undefined,
+    borderRadius: 8,
+    ...(Platform.OS === 'web' && {
+      cursor: 'pointer',
+      userSelect: 'none',
+    }),
+  },
+  buttonPressed: {
+    opacity: 0.6,
+    backgroundColor: colors.border,
   },
   title: {
     fontSize: 20,
@@ -679,12 +707,26 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     boxShadow: '0px 2px 4px rgba(0, 0, 0, 0.05)',
     elevation: 2,
-    cursor: Platform.OS === 'web' ? 'pointer' : undefined,
-    userSelect: Platform.OS === 'web' ? 'none' : undefined,
+    ...(Platform.OS === 'web' && {
+      cursor: 'pointer',
+      userSelect: 'none',
+      transition: 'all 0.2s ease',
+    }),
   },
   overdueCard: {
     borderColor: colors.error,
     borderWidth: 2,
+  },
+  cardPressed: {
+    opacity: 0.7,
+    transform: [{ scale: 0.98 }],
+    backgroundColor: colors.highlight,
+  },
+  cardDisabled: {
+    opacity: 0.6,
+    ...(Platform.OS === 'web' && {
+      cursor: 'not-allowed',
+    }),
   },
   reminderHeader: {
     flexDirection: 'row',
@@ -699,25 +741,33 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: colors.text,
     marginBottom: 4,
-    userSelect: Platform.OS === 'web' ? 'none' : undefined,
+    ...(Platform.OS === 'web' && {
+      userSelect: 'none',
+    }),
   },
   reminderVehicle: {
     fontSize: 14,
     color: colors.textSecondary,
     marginBottom: 4,
-    userSelect: Platform.OS === 'web' ? 'none' : undefined,
+    ...(Platform.OS === 'web' && {
+      userSelect: 'none',
+    }),
   },
   reminderType: {
     fontSize: 14,
     fontWeight: '600',
     color: colors.text,
     marginBottom: 2,
-    userSelect: Platform.OS === 'web' ? 'none' : undefined,
+    ...(Platform.OS === 'web' && {
+      userSelect: 'none',
+    }),
   },
   reminderDate: {
     fontSize: 13,
     color: colors.textSecondary,
-    userSelect: Platform.OS === 'web' ? 'none' : undefined,
+    ...(Platform.OS === 'web' && {
+      userSelect: 'none',
+    }),
   },
   emptyState: {
     alignItems: 'center',

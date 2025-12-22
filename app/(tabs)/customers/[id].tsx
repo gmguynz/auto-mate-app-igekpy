@@ -1109,12 +1109,14 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background,
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
-    maxHeight: '85%',
+    maxHeight: '90%',
+    minHeight: Platform.OS === 'web' ? 500 : '70%',
     height: Platform.OS === 'ios' ? '85%' : 'auto',
     ...(Platform.OS === 'web' && {
       maxWidth: 600,
       alignSelf: 'center',
       width: '100%',
+      marginBottom: 40,
     }),
   },
   transferModalHeader: {
