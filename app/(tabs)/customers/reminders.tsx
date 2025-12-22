@@ -169,12 +169,22 @@ export default function RemindersScreen() {
   };
 
   const sendAutomatedEmail = async (reminder: Reminder) => {
+    console.log('=== SEND AUTOMATED EMAIL START ===');
+    console.log('Platform:', Platform.OS);
+    console.log('Reminder:', {
+      vehicleReg: reminder.vehicleReg,
+      customerEmail: reminder.customerEmail,
+      customerName: reminder.customerName,
+    });
+
     if (!reminder.customerEmail) {
+      console.log('No email address available');
       Alert.alert('Error', 'No email address available for this customer');
       return;
     }
 
     if (!isSupabaseConfigured()) {
+      console.log('Supabase not configured');
       emailService.showSetupInstructions();
       return;
     }
@@ -210,8 +220,7 @@ Please call us on 07 866 2218 to book an appointment.
 Regards,
 Charlie's Workshop`;
 
-      console.log('Sending automated email to:', reminder.customerEmail);
-      console.log('Email body:', body);
+      console.log('Calling emailService.sendEmail...');
       
       const result = await emailService.sendEmail({
         to: reminder.customerEmail,
@@ -221,6 +230,7 @@ Charlie's Workshop`;
       });
 
       console.log('Email send result:', result);
+      console.log('=== SEND AUTOMATED EMAIL END ===');
 
       if (result.success) {
         Alert.alert(
@@ -244,6 +254,7 @@ Charlie's Workshop`;
       }
     } catch (error) {
       console.error('Error sending email:', error);
+      console.log('=== SEND AUTOMATED EMAIL END (ERROR) ===');
       Alert.alert(
         'Error',
         'An unexpected error occurred while sending the email. Please try again.',
@@ -269,7 +280,8 @@ Charlie's Workshop`;
       '3. Domain is verified in Resend dashboard\n' +
       '4. DNS records (TXT, MX, DKIM) are configured\n' +
       '5. Check Edge Function logs in Supabase\n' +
-      '6. Check spam folder\n\n' +
+      '6. Check spam folder\n' +
+      '7. Ensure you are logged in\n\n' +
       'See SUPABASE_SETUP.md for detailed instructions.',
       [
         { text: 'OK' },
@@ -285,7 +297,10 @@ Charlie's Workshop`;
   };
 
   const handleSendReminder = (reminder: Reminder) => {
-    console.log('handleSendReminder called for:', reminder.vehicleReg);
+    console.log('=== HANDLE SEND REMINDER START ===');
+    console.log('Platform:', Platform.OS);
+    console.log('Vehicle:', reminder.vehicleReg);
+    
     const hasEmail = reminder.customerEmail;
     const supabaseConfigured = isSupabaseConfigured();
 
@@ -293,11 +308,13 @@ Charlie's Workshop`;
     console.log('Supabase configured:', supabaseConfigured);
 
     if (!hasEmail) {
+      console.log('No email address');
       Alert.alert('Error', 'No email address available for this customer');
       return;
     }
 
     if (!supabaseConfigured) {
+      console.log('Supabase not configured');
       Alert.alert(
         'Email Service Not Configured',
         'Automated email reminders require Supabase configuration. Please set up the email service to send reminders.',
@@ -312,11 +329,16 @@ Charlie's Workshop`;
       return;
     }
 
+    console.log('Showing confirmation alert');
     Alert.alert(
       'Send Email Reminder',
       `Send automated email reminder to ${reminder.customerName} at ${reminder.customerEmail}?`,
       [
-        { text: 'Cancel', style: 'cancel' },
+        { 
+          text: 'Cancel', 
+          style: 'cancel',
+          onPress: () => console.log('User cancelled email send'),
+        },
         {
           text: 'Send Email',
           onPress: () => {
@@ -326,6 +348,7 @@ Charlie's Workshop`;
         },
       ]
     );
+    console.log('=== HANDLE SEND REMINDER END ===');
   };
 
   const getReminderTypeText = (reminder: Reminder) => {
@@ -409,6 +432,20 @@ Charlie's Workshop`;
           </Text>
         </View>
 
+        {Platform.OS === 'web' && (
+          <View style={[styles.infoCard, { backgroundColor: '#fff3cd', borderColor: '#ffc107' }]}>
+            <IconSymbol
+              ios_icon_name="exclamationmark.triangle"
+              android_material_icon_name="warning"
+              size={20}
+              color="#856404"
+            />
+            <Text style={[styles.infoText, { color: '#856404' }]}>
+              Web Mode: Make sure you are logged in. Check browser console for detailed logs.
+            </Text>
+          </View>
+        )}
+
         {overdueReminders.length > 0 && (
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>
@@ -419,7 +456,7 @@ Charlie's Workshop`;
                 <TouchableOpacity
                   style={[styles.reminderCard, styles.overdueCard]}
                   onPress={() => {
-                    console.log('Reminder card pressed (overdue)');
+                    console.log('Reminder card pressed (overdue):', reminder.vehicleReg);
                     handleSendReminder(reminder);
                   }}
                   activeOpacity={0.7}
@@ -473,7 +510,7 @@ Charlie's Workshop`;
                 <TouchableOpacity
                   style={styles.reminderCard}
                   onPress={() => {
-                    console.log('Reminder card pressed (upcoming)');
+                    console.log('Reminder card pressed (upcoming):', reminder.vehicleReg);
                     handleSendReminder(reminder);
                   }}
                   activeOpacity={0.7}
@@ -614,8 +651,10 @@ const styles = StyleSheet.create({
     backgroundColor: '#e3f2fd',
     padding: 12,
     borderRadius: 8,
-    marginBottom: 20,
+    marginBottom: 12,
     gap: 10,
+    borderWidth: 1,
+    borderColor: colors.primary,
   },
   infoText: {
     flex: 1,

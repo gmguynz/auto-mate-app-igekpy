@@ -1,6 +1,6 @@
 
 import { supabase, isSupabaseConfigured } from '@/integrations/supabase/client';
-import { Alert } from 'react-native';
+import { Alert, Platform } from 'react-native';
 
 export interface EmailData {
   to: string;
@@ -19,6 +19,8 @@ export const emailService = {
    */
   async sendEmail(emailData: EmailData): Promise<{ success: boolean; error?: string }> {
     try {
+      console.log('=== EMAIL SERVICE DEBUG START ===');
+      console.log('Platform:', Platform.OS);
       console.log('Attempting to send email to:', emailData.to);
       console.log('Email subject:', emailData.subject);
 
@@ -34,6 +36,12 @@ export const emailService = {
       // Check if user is authenticated
       const { data: { session }, error: sessionError } = await supabase.auth.getSession();
       
+      console.log('Session check:', {
+        hasSession: !!session,
+        hasAccessToken: !!session?.access_token,
+        sessionError: sessionError?.message,
+      });
+      
       if (sessionError) {
         console.error('Error getting session:', sessionError);
       }
@@ -46,7 +54,15 @@ export const emailService = {
         };
       }
 
-      console.log('User authenticated, session exists');
+      if (!session.access_token) {
+        console.error('Session exists but no access token found');
+        return {
+          success: false,
+          error: 'Authentication token missing. Please log out and log back in.',
+        };
+      }
+
+      console.log('User authenticated, session exists with valid token');
 
       // Convert plain text body to HTML with line breaks
       const htmlBody = emailData.body.replace(/\n/g, '<br>');
@@ -56,7 +72,7 @@ export const emailService = {
         try {
           console.log(`Email send attempt ${attempt}/${MAX_EMAIL_RETRIES}`);
           
-          // Call the Supabase Edge Function with correct parameters
+          // Call the Supabase Edge Function with explicit headers
           const { data, error } = await supabase.functions.invoke('send-reminder-email', {
             body: {
               to: emailData.to,
@@ -64,13 +80,34 @@ export const emailService = {
               html: htmlBody,
               customerName: emailData.customerName,
             },
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${session.access_token}`,
+            },
           });
 
-          console.log('Edge Function response:', { data, error });
+          console.log('Edge Function response:', { 
+            hasData: !!data, 
+            hasError: !!error,
+            errorMessage: error?.message,
+            errorContext: error?.context,
+          });
 
           if (error) {
             console.error('Error invoking Edge Function:', error);
             console.error('Error details:', JSON.stringify(error, null, 2));
+            
+            // Check for authentication errors
+            if (error.message?.includes('JWT') || 
+                error.message?.includes('401') || 
+                error.message?.includes('Unauthorized') ||
+                error.message?.includes('auth')) {
+              console.error('Authentication error detected');
+              return {
+                success: false,
+                error: 'Authentication error. Please log out and log back in, then try again.',
+              };
+            }
             
             // If this is not the last attempt, retry
             if (attempt < MAX_EMAIL_RETRIES) {
@@ -92,8 +129,6 @@ export const emailService = {
               errorMessage = 'Email domain not verified. Please verify your domain in Resend dashboard.';
             } else if (error.message?.includes('FROM_EMAIL')) {
               errorMessage = 'FROM_EMAIL not configured. Please add FROM_EMAIL to Supabase Edge Function secrets.';
-            } else if (error.message?.includes('JWT') || error.message?.includes('auth')) {
-              errorMessage = 'Authentication error. Please log out and log back in, then try again.';
             }
             
             return {
@@ -137,6 +172,7 @@ export const emailService = {
           // Check for success response (Edge Function returns { success: true, id: ..., message: ... })
           if (data && (data.success === true || data.id)) {
             console.log('Email sent successfully. Response:', data);
+            console.log('=== EMAIL SERVICE DEBUG END (SUCCESS) ===');
             return { success: true };
           }
 
@@ -150,6 +186,7 @@ export const emailService = {
 
           // If we got here, something unexpected happened
           console.warn('Unexpected response from email service:', JSON.stringify(data, null, 2));
+          console.log('=== EMAIL SERVICE DEBUG END (UNEXPECTED) ===');
           return {
             success: false,
             error: 'Unexpected response from email service. Please check the Edge Function logs in Supabase dashboard.',
@@ -169,6 +206,7 @@ export const emailService = {
       }
 
       // Should never reach here, but just in case
+      console.log('=== EMAIL SERVICE DEBUG END (FAILED) ===');
       return {
         success: false,
         error: 'Failed to send email after multiple attempts',
@@ -176,6 +214,7 @@ export const emailService = {
     } catch (error) {
       console.error('Exception sending email:', error);
       console.error('Exception details:', JSON.stringify(error, null, 2));
+      console.log('=== EMAIL SERVICE DEBUG END (EXCEPTION) ===');
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Unknown error occurred',
