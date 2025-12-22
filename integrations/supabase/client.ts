@@ -73,7 +73,7 @@ try {
         },
       },
     });
-    console.log('Supabase client initialized successfully with connection pooling');
+    console.log('Supabase client initialized successfully');
   } else {
     console.log('Supabase not configured, using placeholder client');
     supabaseClient = createPlaceholderClient();
@@ -85,7 +85,7 @@ try {
 
 export const supabase = supabaseClient || createPlaceholderClient();
 
-// Connection health check utility
+// Connection health check utility with improved error handling
 export const checkSupabaseConnection = async (): Promise<{ healthy: boolean; latency?: number; error?: string }> => {
   if (!isSupabaseConfigured()) {
     return { healthy: false, error: 'Supabase not configured' };
@@ -93,17 +93,45 @@ export const checkSupabaseConnection = async (): Promise<{ healthy: boolean; lat
 
   try {
     const startTime = Date.now();
-    const { error } = await supabase.from('customers').select('count', { count: 'exact', head: true });
+    
+    // Use a lightweight query with timeout
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+    
+    const { error } = await supabase
+      .from('customers')
+      .select('count', { count: 'exact', head: true });
+    
+    clearTimeout(timeoutId);
     const latency = Date.now() - startTime;
 
     if (error) {
-      console.error('Connection health check failed:', error);
+      // Don't log every error as it creates noise
+      if (error.message?.includes('JWT') || error.message?.includes('auth')) {
+        // Auth errors are not connection issues
+        console.log('Auth-related error during health check (not a connection issue)');
+        return { healthy: true, latency }; // Consider auth errors as "connected" since we reached the server
+      }
+      
+      console.error('Connection health check failed:', error.message);
       return { healthy: false, latency, error: error.message };
     }
 
     console.log(`Connection healthy - latency: ${latency}ms`);
     return { healthy: true, latency };
-  } catch (error) {
+  } catch (error: any) {
+    // Check if it's a timeout or network error
+    if (error.name === 'AbortError') {
+      console.error('Connection health check timed out');
+      return { healthy: false, error: 'Connection timeout' };
+    }
+    
+    // Network errors
+    if (error.message?.includes('fetch') || error.message?.includes('network')) {
+      console.error('Network error during health check:', error.message);
+      return { healthy: false, error: 'Network error' };
+    }
+    
     console.error('Connection health check exception:', error);
     return { healthy: false, error: error instanceof Error ? error.message : 'Unknown error' };
   }

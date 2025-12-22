@@ -6,9 +6,10 @@ import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { notificationService } from '@/utils/notificationService';
 import { ErrorBoundary } from 'react-error-boundary';
-import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, AppState } from 'react-native';
 import { colors } from '@/styles/commonStyles';
 import { AuthProvider, useAuth } from '@/contexts/AuthContext';
+import { connectionMonitor } from '@/utils/connectionMonitor';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -43,6 +44,20 @@ function RootLayoutNav() {
 
     setIsNavigationReady(true);
   }, [user, loading, segments]);
+
+  // Handle app state changes to reset connection monitor
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (nextAppState) => {
+      if (nextAppState === 'active') {
+        console.log('App became active, resetting connection monitor');
+        connectionMonitor.reset();
+      }
+    });
+
+    return () => {
+      subscription.remove();
+    };
+  }, []);
 
   if (loading || !isNavigationReady) {
     return (
@@ -109,7 +124,19 @@ export default function RootLayout() {
 
     if (loaded) {
       initializeNotifications();
+      
+      // Start connection monitoring with a longer interval (2 minutes) to reduce false positives
+      // Only monitor if we're actually using Supabase
+      const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
+      if (supabaseUrl && supabaseUrl.startsWith('https://')) {
+        console.log('Starting connection monitoring with 2-minute interval');
+        connectionMonitor.startMonitoring(120000); // Check every 2 minutes
+      }
     }
+
+    return () => {
+      connectionMonitor.stopMonitoring();
+    };
   }, [loaded]);
 
   if (!loaded && !error) {

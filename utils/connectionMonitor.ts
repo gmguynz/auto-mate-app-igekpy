@@ -10,53 +10,95 @@ interface ConnectionStatus {
 
 class ConnectionMonitor {
   private status: ConnectionStatus = {
-    isConnected: false,
+    isConnected: true, // Default to true to avoid false offline messages
     lastCheck: new Date(),
   };
   private checkInterval: NodeJS.Timeout | null = null;
   private listeners: Array<(status: ConnectionStatus) => void> = [];
+  private consecutiveFailures = 0;
+  private readonly MAX_FAILURES_BEFORE_OFFLINE = 3; // Require 3 consecutive failures before marking offline
 
   constructor() {
-    this.checkConnection();
+    // Don't check immediately on construction to avoid startup false positives
   }
 
   async checkConnection(): Promise<ConnectionStatus> {
     try {
       const result = await checkSupabaseConnection();
-      this.status = {
-        isConnected: result.healthy,
-        latency: result.latency,
-        lastCheck: new Date(),
-        error: result.error,
-      };
+      
+      if (result.healthy) {
+        // Connection successful - reset failure counter
+        this.consecutiveFailures = 0;
+        this.status = {
+          isConnected: true,
+          latency: result.latency,
+          lastCheck: new Date(),
+          error: undefined,
+        };
+      } else {
+        // Connection failed - increment failure counter
+        this.consecutiveFailures++;
+        
+        // Only mark as offline after multiple consecutive failures
+        if (this.consecutiveFailures >= this.MAX_FAILURES_BEFORE_OFFLINE) {
+          console.warn(`Connection check failed ${this.consecutiveFailures} times, marking as offline`);
+          this.status = {
+            isConnected: false,
+            lastCheck: new Date(),
+            error: result.error,
+          };
+        } else {
+          console.log(`Connection check failed (${this.consecutiveFailures}/${this.MAX_FAILURES_BEFORE_OFFLINE}), keeping online status`);
+          // Keep previous status but update last check time
+          this.status = {
+            ...this.status,
+            lastCheck: new Date(),
+          };
+        }
+      }
       
       this.notifyListeners();
       return this.status;
     } catch (error) {
-      console.error('Connection check failed:', error);
-      this.status = {
-        isConnected: false,
-        lastCheck: new Date(),
-        error: error instanceof Error ? error.message : 'Unknown error',
-      };
+      console.error('Connection check exception:', error);
+      this.consecutiveFailures++;
+      
+      // Only mark as offline after multiple consecutive failures
+      if (this.consecutiveFailures >= this.MAX_FAILURES_BEFORE_OFFLINE) {
+        this.status = {
+          isConnected: false,
+          lastCheck: new Date(),
+          error: error instanceof Error ? error.message : 'Unknown error',
+        };
+      } else {
+        // Keep previous status but update last check time
+        this.status = {
+          ...this.status,
+          lastCheck: new Date(),
+        };
+      }
       
       this.notifyListeners();
       return this.status;
     }
   }
 
-  startMonitoring(intervalMs: number = 30000): void {
+  startMonitoring(intervalMs: number = 60000): void {
     if (this.checkInterval) {
       this.stopMonitoring();
     }
 
     console.log(`Starting connection monitoring (interval: ${intervalMs}ms)`);
+    
+    // Do initial check after a delay to avoid startup false positives
+    setTimeout(() => {
+      this.checkConnection();
+    }, 5000);
+
+    // Then check periodically
     this.checkInterval = setInterval(() => {
       this.checkConnection();
     }, intervalMs);
-
-    // Initial check
-    this.checkConnection();
   }
 
   stopMonitoring(): void {
@@ -88,6 +130,18 @@ class ConnectionMonitor {
         console.error('Error in connection status listener:', error);
       }
     });
+  }
+
+  // Reset the connection status to online (useful after app resume)
+  reset(): void {
+    console.log('Resetting connection monitor to online state');
+    this.consecutiveFailures = 0;
+    this.status = {
+      isConnected: true,
+      lastCheck: new Date(),
+      error: undefined,
+    };
+    this.notifyListeners();
   }
 }
 
