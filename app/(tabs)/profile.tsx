@@ -109,17 +109,31 @@ export default function ProfileScreen() {
 
       if (error) {
         console.error('Password update error:', error);
-        Alert.alert('Error', error.message || 'Failed to update password');
+        
+        // Handle specific error cases
+        if (error.message && error.message.includes('same password')) {
+          Alert.alert('Error', 'New password must be different from your current password. Please choose a different password.');
+        } else {
+          Alert.alert('Error', error.message || 'Failed to update password');
+        }
       } else {
-        console.log('Password updated successfully');
-        Alert.alert('Success', 'Password updated successfully. You can now use your new password to log in.');
+        console.log('Password updated successfully:', data);
+        
+        // Close modal and reset fields
         setShowPasswordModal(false);
         setNewPassword('');
         setConfirmPassword('');
+        
+        // Show success message
+        Alert.alert(
+          'Password Changed Successfully',
+          'Your password has been updated. You can now use your new password to log in.',
+          [{ text: 'OK' }]
+        );
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Password update error:', error);
-      Alert.alert('Error', 'Failed to update password');
+      Alert.alert('Error', error.message || 'Failed to update password');
     } finally {
       setChangingPassword(false);
     }
@@ -374,7 +388,7 @@ export default function ProfileScreen() {
               />
 
               <Text style={styles.helperText}>
-                Password must be at least 6 characters long
+                Password must be at least 6 characters long and different from your current password
               </Text>
 
               <TouchableOpacity

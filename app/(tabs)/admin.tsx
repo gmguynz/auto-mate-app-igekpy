@@ -110,6 +110,7 @@ export default function AdminScreen() {
 
     setCreating(true);
     try {
+      console.log('Creating user with email:', newUserEmail);
       const { data, error } = await supabase.auth.signUp({
         email: newUserEmail,
         password: newUserPassword,
@@ -125,11 +126,41 @@ export default function AdminScreen() {
 
       if (error) {
         console.error('Error creating user:', error);
+        
+        // Check if it's an SMTP configuration error
+        if (error.message && error.message.includes('Error sending confirmation email')) {
+          Alert.alert(
+            'SMTP Configuration Required',
+            'The user account was created, but the confirmation email could not be sent because SMTP is not configured.\n\n' +
+            'To fix this:\n' +
+            '1. Go to your Supabase project dashboard\n' +
+            '2. Navigate to Authentication > Email Templates\n' +
+            '3. Configure SMTP settings\n\n' +
+            'For now, you can disable email confirmation in Authentication > Providers > Email to allow users to log in immediately.',
+            [
+              {
+                text: 'OK',
+                onPress: () => {
+                  setShowCreateModal(false);
+                  setNewUserEmail('');
+                  setNewUserPassword('');
+                  setNewUserFullName('');
+                  setNewUserId('');
+                  setNewUserRole('user');
+                  loadUsers(false);
+                },
+              },
+            ]
+          );
+          return;
+        }
+        
         Alert.alert('Error', error.message || 'Failed to create user');
         return;
       }
 
       if (data.user) {
+        // Try to create the profile, but don't fail if it errors
         const { error: profileError } = await supabase
           .from('user_profiles')
           .insert({
@@ -146,9 +177,14 @@ export default function AdminScreen() {
         }
       }
 
+      // Check if email confirmation is required
+      const confirmationRequired = !data.session;
+      
       Alert.alert(
         'Success',
-        `User created successfully! An email verification link has been sent to ${newUserEmail}. The user must verify their email before they can log in.${newUserId ? `\n\nUser ID: ${newUserId}` : ''}`,
+        confirmationRequired
+          ? `User created successfully!\n\nAn email verification link has been sent to ${newUserEmail}. The user must verify their email before they can log in.${newUserId ? `\n\nUser ID: ${newUserId}` : ''}`
+          : `User created successfully!\n\nThe user can now log in with their email and password.${newUserId ? `\n\nUser ID: ${newUserId}` : ''}`,
         [
           {
             text: 'OK',
@@ -164,9 +200,32 @@ export default function AdminScreen() {
           },
         ]
       );
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error creating user:', error);
-      Alert.alert('Error', 'Failed to create user');
+      
+      // Check if it's an SMTP error
+      if (error.message && (error.message.includes('SMTP') || error.message.includes('email'))) {
+        Alert.alert(
+          'SMTP Configuration Required',
+          'Unable to send confirmation email. Please configure SMTP in your Supabase project settings or disable email confirmation.',
+          [
+            {
+              text: 'OK',
+              onPress: () => {
+                setShowCreateModal(false);
+                setNewUserEmail('');
+                setNewUserPassword('');
+                setNewUserFullName('');
+                setNewUserId('');
+                setNewUserRole('user');
+                loadUsers(false);
+              },
+            },
+          ]
+        );
+      } else {
+        Alert.alert('Error', 'Failed to create user. Please try again.');
+      }
     } finally {
       setCreating(false);
     }
