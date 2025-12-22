@@ -109,8 +109,16 @@ export default function AdminScreen() {
     }
 
     setCreating(true);
+    
+    // Store current session to restore it after user creation
+    const { data: currentSession } = await supabase.auth.getSession();
+    const currentAccessToken = currentSession?.session?.access_token;
+    const currentRefreshToken = currentSession?.session?.refresh_token;
+    
     try {
       console.log('Creating user with email:', newUserEmail);
+      
+      // Create user with metadata - the database trigger will create the profile automatically
       const { data, error } = await supabase.auth.signUp({
         email: newUserEmail,
         password: newUserPassword,
@@ -128,19 +136,33 @@ export default function AdminScreen() {
         console.error('Error creating user:', error);
         
         // Check if it's an SMTP configuration error
-        if (error.message && error.message.includes('Error sending confirmation email')) {
+        if (error.message && (
+          error.message.includes('Error sending confirmation email') ||
+          error.message.includes('SMTP') ||
+          error.message.includes('API key not found')
+        )) {
           Alert.alert(
-            'SMTP Configuration Required',
-            'The user account was created, but the confirmation email could not be sent because SMTP is not configured.\n\n' +
+            'Email Configuration Issue',
+            'The user account was created successfully, but the confirmation email could not be sent.\n\n' +
+            'This is because SMTP is not properly configured with your Resend API key.\n\n' +
             'To fix this:\n' +
             '1. Go to your Supabase project dashboard\n' +
-            '2. Navigate to Authentication > Email Templates\n' +
-            '3. Configure SMTP settings\n\n' +
-            'For now, you can disable email confirmation in Authentication > Providers > Email to allow users to log in immediately.',
+            '2. Navigate to Project Settings > Auth\n' +
+            '3. Scroll to SMTP Settings\n' +
+            '4. Configure with your Resend SMTP credentials\n\n' +
+            'Alternatively, you can disable email confirmation in Authentication > Providers > Email to allow users to log in immediately without verification.',
             [
               {
                 text: 'OK',
-                onPress: () => {
+                onPress: async () => {
+                  // Restore the admin session
+                  if (currentAccessToken && currentRefreshToken) {
+                    await supabase.auth.setSession({
+                      access_token: currentAccessToken,
+                      refresh_token: currentRefreshToken,
+                    });
+                  }
+                  
                   setShowCreateModal(false);
                   setNewUserEmail('');
                   setNewUserPassword('');
@@ -155,25 +177,48 @@ export default function AdminScreen() {
           return;
         }
         
+        // Restore admin session on error
+        if (currentAccessToken && currentRefreshToken) {
+          await supabase.auth.setSession({
+            access_token: currentAccessToken,
+            refresh_token: currentRefreshToken,
+          });
+        }
+        
         Alert.alert('Error', error.message || 'Failed to create user');
         return;
       }
 
       if (data.user) {
-        // Try to create the profile, but don't fail if it errors
-        const { error: profileError } = await supabase
-          .from('user_profiles')
-          .insert({
-            id: data.user.id,
-            email: newUserEmail,
-            full_name: newUserFullName,
-            user_id: newUserId || null,
-            role: newUserRole,
-          });
+        console.log('User created successfully:', data.user.id);
+        
+        // If email confirmation is disabled, the user will be auto-logged in
+        // We need to restore the admin session
+        if (data.session) {
+          console.log('User was auto-logged in, restoring admin session...');
+          
+          // Restore the admin session
+          if (currentAccessToken && currentRefreshToken) {
+            await supabase.auth.setSession({
+              access_token: currentAccessToken,
+              refresh_token: currentRefreshToken,
+            });
+            console.log('Admin session restored');
+          }
+        }
 
-        if (profileError) {
-          console.error('Error creating user profile:', profileError);
-          console.log('User created but profile creation failed - will be created on first login');
+        // Update the user_id in the profile if provided
+        if (newUserId) {
+          console.log('Updating user_id in profile...');
+          const { error: updateError } = await supabase
+            .from('user_profiles')
+            .update({ user_id: newUserId })
+            .eq('id', data.user.id);
+
+          if (updateError) {
+            console.error('Error updating user_id:', updateError);
+            // Don't fail the whole operation, just log it
+          }
         }
       }
 
@@ -203,11 +248,23 @@ export default function AdminScreen() {
     } catch (error: any) {
       console.error('Error creating user:', error);
       
+      // Restore admin session on error
+      if (currentAccessToken && currentRefreshToken) {
+        await supabase.auth.setSession({
+          access_token: currentAccessToken,
+          refresh_token: currentRefreshToken,
+        });
+      }
+      
       // Check if it's an SMTP error
-      if (error.message && (error.message.includes('SMTP') || error.message.includes('email'))) {
+      if (error.message && (
+        error.message.includes('SMTP') || 
+        error.message.includes('email') ||
+        error.message.includes('API key not found')
+      )) {
         Alert.alert(
-          'SMTP Configuration Required',
-          'Unable to send confirmation email. Please configure SMTP in your Supabase project settings or disable email confirmation.',
+          'Email Configuration Issue',
+          'Unable to send confirmation email. Please configure SMTP with your Resend API key in your Supabase project settings or disable email confirmation.',
           [
             {
               text: 'OK',
