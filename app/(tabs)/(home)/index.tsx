@@ -177,8 +177,10 @@ export default function HomeScreen() {
   };
 
   const filteredCustomers = getFilteredCustomers();
-  const userName = profile?.full_name || user?.email?.split('@')[0] || 'User';
-  const greeting = `Welcome back, ${userName}`;
+  const fullName = profile?.full_name || user?.email?.split('@')[0] || 'User';
+  const firstName = fullName.split(' ')[0];
+  const welcomeText = 'Welcome back,';
+  const greeting = `${welcomeText} ${firstName}`;
 
   return (
     <View style={styles.container}>
