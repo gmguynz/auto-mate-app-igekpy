@@ -181,7 +181,6 @@ export default function HomeScreen() {
   const firstName = fullName.split(' ')[0];
   const dashboardTitle = "Charlie's Workshop Dashboard";
   const welcomeText = 'Welcome back,';
-  const welcomeMessage = `${welcomeText} ${firstName}`;
 
   return (
     <View style={styles.container}>
@@ -192,17 +191,18 @@ export default function HomeScreen() {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}
       >
         <View style={styles.header}>
-          <View style={styles.headerTop}>
-            <View style={styles.headerTextContainer}>
-              <Text style={styles.dashboardTitle}>{dashboardTitle}</Text>
-              <Text style={styles.welcomeMessage}>{welcomeMessage}</Text>
+          <Text style={styles.dashboardTitle}>{dashboardTitle}</Text>
+          <View style={styles.welcomeRow}>
+            <View style={styles.welcomeTextContainer}>
+              <Text style={styles.welcomeText}>{welcomeText}</Text>
+              <Text style={styles.welcomeName}>{firstName}</Text>
             </View>
             {isAdmin && (
               <View style={styles.adminBadge}>
                 <IconSymbol
                   ios_icon_name="shield.fill"
                   android_material_icon_name="admin-panel-settings"
-                  size={16}
+                  size={14}
                   color={colors.primary}
                 />
                 <Text style={styles.adminBadgeText}>ADMIN</Text>
@@ -532,39 +532,45 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
   },
-  headerTop: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-  },
-  headerTextContainer: {
-    flex: 1,
-    marginRight: 12,
-  },
   dashboardTitle: {
     fontSize: 32,
     fontWeight: '800',
     color: colors.text,
-    marginBottom: 6,
+    marginBottom: 12,
   },
-  welcomeMessage: {
-    fontSize: 16,
+  welcomeRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  welcomeTextContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  welcomeText: {
+    fontSize: 20,
     color: colors.textSecondary,
     fontWeight: '500',
+  },
+  welcomeName: {
+    fontSize: 20,
+    color: colors.text,
+    fontWeight: '600',
   },
   adminBadge: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
     backgroundColor: colors.highlightBlue,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 10,
     borderWidth: 1,
     borderColor: colors.primary,
   },
   adminBadgeText: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '700',
     color: colors.primary,
   },
