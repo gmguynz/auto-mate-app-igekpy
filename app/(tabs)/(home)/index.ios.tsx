@@ -131,6 +131,11 @@ export default function HomeScreen() {
     }
   };
 
+  const handleNewJobCard = () => {
+    console.log('User tapped New Job Card from home screen');
+    router.push('/customers/add-job-card?returnTo=home');
+  };
+
   const getFilteredCustomers = () => {
     if (!searchQuery.trim()) {
       return [];
@@ -276,7 +281,7 @@ export default function HomeScreen() {
           <View style={styles.quickActionsGrid}>
             <TouchableOpacity
               style={[styles.quickActionCard, styles.quickActionPrimary]}
-              onPress={() => router.push('/customers/add-job-card')}
+              onPress={handleNewJobCard}
               activeOpacity={0.7}
             >
               <View style={styles.quickActionIcon}>
@@ -586,10 +591,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     borderWidth: 1,
     borderColor: colors.border,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.04,
-    shadowRadius: 4,
+    boxShadow: '0px 2px 4px rgba(0, 0, 0, 0.04)',
     elevation: 2,
   },
   searchIcon: {
@@ -599,6 +601,8 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 16,
     color: colors.text,
+    cursor: Platform.OS === 'web' ? 'text' : undefined,
+    outlineStyle: Platform.OS === 'web' ? 'none' : undefined,
   },
   searchResults: {
     marginHorizontal: 20,
@@ -652,10 +656,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 8,
+    boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.06)',
     elevation: 3,
   },
   quickActionPrimary: {
@@ -695,10 +696,7 @@ const styles = StyleSheet.create({
     padding: 20,
     borderWidth: 1,
     borderColor: colors.border,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 8,
+    boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.06)',
     elevation: 3,
   },
   statCardOpen: {
@@ -762,10 +760,7 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     borderWidth: 1,
     borderColor: colors.border,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 6,
+    boxShadow: '0px 2px 6px rgba(0, 0, 0, 0.06)',
     elevation: 2,
   },
   jobCardPreviewHeader: {

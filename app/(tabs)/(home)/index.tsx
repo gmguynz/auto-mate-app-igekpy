@@ -131,6 +131,11 @@ export default function HomeScreen() {
     }
   };
 
+  const handleNewJobCard = () => {
+    console.log('User tapped New Job Card from home screen');
+    router.push('/customers/add-job-card?returnTo=home');
+  };
+
   const getFilteredCustomers = () => {
     if (!searchQuery.trim()) {
       return [];
@@ -276,7 +281,7 @@ export default function HomeScreen() {
           <View style={styles.quickActionsGrid}>
             <TouchableOpacity
               style={[styles.quickActionCard, styles.quickActionPrimary]}
-              onPress={() => router.push('/customers/add-job-card')}
+              onPress={handleNewJobCard}
               activeOpacity={0.7}
             >
               <View style={styles.quickActionIcon}>

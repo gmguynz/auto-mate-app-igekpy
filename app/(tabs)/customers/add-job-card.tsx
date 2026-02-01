@@ -28,6 +28,7 @@ export default function AddJobCardScreen() {
   const jobCardId = params.id as string | undefined;
   const preselectedCustomerId = params.customerId as string | undefined;
   const preselectedVehicleId = params.vehicleId as string | undefined;
+  const returnTo = params.returnTo as string | undefined;
   const { isAdmin } = useAuth();
 
   const [loading, setLoading] = useState(false);
@@ -138,6 +139,15 @@ export default function AddJobCardScreen() {
     setLabourEntries(jobCard.labourEntries || []);
   };
 
+  const handleBack = () => {
+    console.log('User tapped back button, returnTo:', returnTo);
+    if (returnTo === 'home') {
+      router.push('/(tabs)/(home)');
+    } else {
+      router.back();
+    }
+  };
+
   const handleSave = async () => {
     console.log('User tapped Save Job Card button');
     
@@ -190,7 +200,11 @@ export default function AddJobCardScreen() {
         console.log('Job card created successfully');
       }
 
-      router.back();
+      if (returnTo === 'home') {
+        router.push('/(tabs)/(home)');
+      } else {
+        router.back();
+      }
     } catch (error: any) {
       console.error('Error saving job card:', error);
       showErrorModal(error.message || 'Failed to save job card');
@@ -385,7 +399,7 @@ export default function AddJobCardScreen() {
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backButton} activeOpacity={0.7}>
+        <TouchableOpacity onPress={handleBack} style={styles.backButton} activeOpacity={0.7}>
           <IconSymbol
             ios_icon_name="chevron.left"
             android_material_icon_name="arrow-back"
