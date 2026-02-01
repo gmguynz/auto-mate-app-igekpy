@@ -270,6 +270,7 @@ export default function HomeScreen() {
             </Text>
             {filteredCustomers.slice(0, 3).map((customer, index) => {
               const displayName = customer.companyName || `${customer.firstName} ${customer.lastName}`;
+              const vehicleCountText = customer.vehicles.length === 1 ? '1 vehicle' : `${customer.vehicles.length} vehicles`;
               return (
                 <React.Fragment key={index}>
                   <TouchableOpacity
@@ -283,9 +284,7 @@ export default function HomeScreen() {
                       <Text style={styles.searchResultName}>{displayName}</Text>
                       <Text style={styles.searchResultDetail}>{customer.email}</Text>
                       {customer.vehicles.length > 0 && (
-                        <Text style={styles.searchResultDetail}>
-                          {customer.vehicles.length} vehicle{customer.vehicles.length !== 1 ? 's' : ''}
-                        </Text>
+                        <Text style={styles.searchResultDetail}>{vehicleCountText}</Text>
                       )}
                     </View>
                     <IconSymbol
@@ -328,9 +327,7 @@ export default function HomeScreen() {
             </View>
             <View style={styles.actionContent}>
               <Text style={styles.actionTitle}>View Customers</Text>
-              <Text style={styles.actionDescription}>
-                Browse and manage your customer database
-              </Text>
+              <Text style={styles.actionDescription}>Browse and manage your customer database</Text>
             </View>
             <IconSymbol
               ios_icon_name="chevron.right"
@@ -354,9 +351,7 @@ export default function HomeScreen() {
             </View>
             <View style={styles.actionContent}>
               <Text style={styles.actionTitle}>Add New Customer</Text>
-              <Text style={styles.actionDescription}>
-                Create a new customer record with vehicle details
-              </Text>
+              <Text style={styles.actionDescription}>Create a new customer record with vehicle details</Text>
             </View>
             <IconSymbol
               ios_icon_name="chevron.right"
@@ -380,9 +375,7 @@ export default function HomeScreen() {
             </View>
             <View style={styles.actionContent}>
               <Text style={styles.actionTitle}>Create Job Card</Text>
-              <Text style={styles.actionDescription}>
-                Start a new job card for a customer vehicle
-              </Text>
+              <Text style={styles.actionDescription}>Start a new job card for a customer vehicle</Text>
             </View>
             <IconSymbol
               ios_icon_name="chevron.right"
@@ -406,9 +399,31 @@ export default function HomeScreen() {
             </View>
             <View style={styles.actionContent}>
               <Text style={styles.actionTitle}>View Job Cards</Text>
-              <Text style={styles.actionDescription}>
-                Browse all job cards and their status
-              </Text>
+              <Text style={styles.actionDescription}>Browse all job cards and their status</Text>
+            </View>
+            <IconSymbol
+              ios_icon_name="chevron.right"
+              android_material_icon_name="chevron-right"
+              size={20}
+              color={colors.textSecondary}
+            />
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.actionCard}
+            onPress={() => router.push('/customers/parts')}
+          >
+            <View style={styles.actionIcon}>
+              <IconSymbol
+                ios_icon_name="wrench.and.screwdriver.fill"
+                android_material_icon_name="build"
+                size={24}
+                color="#FF9800"
+              />
+            </View>
+            <View style={styles.actionContent}>
+              <Text style={styles.actionTitle}>Parts Management</Text>
+              <Text style={styles.actionDescription}>Manage inventory and stock parts</Text>
             </View>
             <IconSymbol
               ios_icon_name="chevron.right"
@@ -432,9 +447,7 @@ export default function HomeScreen() {
             </View>
             <View style={styles.actionContent}>
               <Text style={styles.actionTitle}>Vehicle Database</Text>
-              <Text style={styles.actionDescription}>
-                Search vehicles by registration number
-              </Text>
+              <Text style={styles.actionDescription}>Search vehicles by registration number</Text>
             </View>
             <IconSymbol
               ios_icon_name="chevron.right"

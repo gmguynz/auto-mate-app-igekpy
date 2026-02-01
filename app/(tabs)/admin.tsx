@@ -112,6 +112,80 @@ export default function AdminScreen() {
     setShowCreateModal(true);
   };
 
+  const handleSubmitCreateUser = async () => {
+    console.log('User tapped Submit Create User button');
+    
+    if (!email.trim() || !password.trim()) {
+      alert('Please enter email and password');
+      return;
+    }
+
+    if (password.length < 6) {
+      alert('Password must be at least 6 characters');
+      return;
+    }
+
+    setCreating(true);
+    try {
+      // Store current admin session
+      const { data: currentSession } = await supabase.auth.getSession();
+      const adminSession = currentSession.session;
+
+      console.log('Creating new user:', email, 'with role:', role);
+
+      // Create the new user
+      const { data: newUser, error: signUpError } = await supabase.auth.signUp({
+        email: email.trim(),
+        password: password.trim(),
+        options: {
+          data: {
+            full_name: fullName.trim() || null,
+            role: role,
+          },
+        },
+      });
+
+      if (signUpError) {
+        console.error('Error creating user:', signUpError);
+        throw signUpError;
+      }
+
+      console.log('User created successfully:', newUser.user?.email);
+
+      // Restore admin session
+      if (adminSession) {
+        console.log('Restoring admin session...');
+        await supabase.auth.setSession({
+          access_token: adminSession.access_token,
+          refresh_token: adminSession.refresh_token,
+        });
+        console.log('Admin session restored');
+      }
+
+      alert(`User ${email} created successfully!`);
+      setShowCreateModal(false);
+      setEmail('');
+      setPassword('');
+      setFullName('');
+      setRole('user');
+      
+      // Reload users list
+      loadUsers(false);
+    } catch (error: any) {
+      console.error('Error creating user:', error);
+      
+      if (error.message?.includes('SMTP')) {
+        alert('User created but confirmation email could not be sent. The user can still log in with their credentials.');
+        setShowCreateModal(false);
+        loadUsers(false);
+      } else {
+        alert(error.message || 'Failed to create user');
+      }
+    } finally {
+      setCreating(false);
+    }
+  };
+
   const handleEditUser = (user: UserProfile) => {
     console.log('User tapped Edit User button for:', user.email);
     setSelectedUser(user);
@@ -441,6 +515,95 @@ export default function AdminScreen() {
           </React.Fragment>
         ))}
       </ScrollView>
+
+      {/* Create User Modal */}
+      <Modal visible={showCreateModal} animationType="slide" transparent>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Create New User</Text>
+              <TouchableOpacity onPress={() => setShowCreateModal(false)} activeOpacity={0.7}>
+                <IconSymbol
+                  ios_icon_name="xmark.circle.fill"
+                  android_material_icon_name="cancel"
+                  size={28}
+                  color={colors.textSecondary}
+                />
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.formContainer}>
+              <Text style={styles.formLabel}>Email *</Text>
+              <TextInput
+                style={styles.formInput}
+                value={email}
+                onChangeText={setEmail}
+                placeholder="Enter email address"
+                placeholderTextColor={colors.textSecondary}
+                keyboardType="email-address"
+                autoCapitalize="none"
+              />
+
+              <Text style={styles.formLabel}>Password *</Text>
+              <TextInput
+                style={styles.formInput}
+                value={password}
+                onChangeText={setPassword}
+                placeholder="Enter password (min 6 characters)"
+                placeholderTextColor={colors.textSecondary}
+                secureTextEntry
+              />
+
+              <Text style={styles.formLabel}>Full Name</Text>
+              <TextInput
+                style={styles.formInput}
+                value={fullName}
+                onChangeText={setFullName}
+                placeholder="Enter full name (optional)"
+                placeholderTextColor={colors.textSecondary}
+              />
+
+              <Text style={styles.formLabel}>Role</Text>
+              <View style={styles.roleSelector}>
+                <TouchableOpacity
+                  style={[styles.roleOption, role === 'user' && styles.roleOptionActive]}
+                  onPress={() => setRole('user')}
+                  activeOpacity={0.7}
+                >
+                  <Text style={[styles.roleOptionText, role === 'user' && styles.roleOptionTextActive]}>User</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.roleOption, role === 'technician' && styles.roleOptionActive]}
+                  onPress={() => setRole('technician')}
+                  activeOpacity={0.7}
+                >
+                  <Text style={[styles.roleOptionText, role === 'technician' && styles.roleOptionTextActive]}>Technician</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.roleOption, role === 'admin' && styles.roleOptionActive]}
+                  onPress={() => setRole('admin')}
+                  activeOpacity={0.7}
+                >
+                  <Text style={[styles.roleOptionText, role === 'admin' && styles.roleOptionTextActive]}>Admin</Text>
+                </TouchableOpacity>
+              </View>
+
+              <TouchableOpacity
+                style={[styles.saveButton, creating && styles.saveButtonDisabled]}
+                onPress={handleSubmitCreateUser}
+                disabled={creating}
+                activeOpacity={0.7}
+              >
+                {creating ? (
+                  <ActivityIndicator color="#FFFFFF" />
+                ) : (
+                  <Text style={styles.saveButtonText}>Create User</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
 
       {/* Edit User Modal */}
       <Modal visible={showEditModal} animationType="slide" transparent>
