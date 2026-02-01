@@ -167,6 +167,8 @@ export default function JobCardDetailScreen() {
   const vehicleMakeModel = `${jobCard.vehicleMake} ${jobCard.vehicleModel}`;
   const statusColor = getStatusColor(jobCard.status);
   const statusLabel = getStatusLabel(jobCard.status);
+  const odometerDisplay = jobCard.odometer ? `${jobCard.odometer} km` : '';
+  const taxRateDisplay = `${taxRate}%`;
 
   return (
     <View style={styles.container}>
@@ -283,7 +285,7 @@ export default function JobCardDetailScreen() {
             {jobCard.odometer && (
               <View style={styles.infoRow}>
                 <Text style={styles.infoLabel}>Odometer:</Text>
-                <Text style={styles.infoValue}>{jobCard.odometer} km</Text>
+                <Text style={styles.infoValue}>{odometerDisplay}</Text>
               </View>
             )}
             {jobCard.wofExpiry && (
@@ -400,7 +402,7 @@ export default function JobCardDetailScreen() {
             </View>
             
             <View style={styles.costRow}>
-              <Text style={styles.costLabel}>Tax ({taxRate}%):</Text>
+              <Text style={styles.costLabel}>Tax ({taxRateDisplay}):</Text>
               <Text style={styles.costValue}>{formatCurrency(taxAmount)}</Text>
             </View>
             
