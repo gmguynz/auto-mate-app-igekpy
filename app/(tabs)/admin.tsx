@@ -18,6 +18,8 @@ import { colors } from '@/styles/commonStyles';
 import { IconSymbol } from '@/components/IconSymbol';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
+import { jobCardStorage } from '@/utils/jobCardStorage';
+import { AppSettings } from '@/types/jobCard';
 
 interface UserProfile {
   id: string;
@@ -40,6 +42,7 @@ export default function AdminScreen() {
   const [selectedUser, setSelectedUser] = useState<UserProfile | null>(null);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showRoleModal, setShowRoleModal] = useState(false);
+  const [showSettingsModal, setShowSettingsModal] = useState(false);
   
   // Form state
   const [email, setEmail] = useState('');
@@ -48,6 +51,10 @@ export default function AdminScreen() {
   const [role, setRole] = useState<'admin' | 'user' | 'technician'>('user');
   const [creating, setCreating] = useState(false);
   const [updating, setUpdating] = useState(false);
+  
+  // Settings state
+  const [settings, setSettings] = useState<AppSettings>({ defaultHourlyRate: 0, defaultTaxRate: 0 });
+  const [savingSettings, setSavingSettings] = useState(false);
 
   useEffect(() => {
     if (!isAdmin) {
@@ -56,7 +63,19 @@ export default function AdminScreen() {
       return;
     }
     loadUsers(true);
+    loadSettings();
   }, [isAdmin]);
+
+  const loadSettings = async () => {
+    try {
+      console.log('Loading app settings...');
+      const appSettings = await jobCardStorage.getSettings();
+      setSettings(appSettings);
+      console.log('Settings loaded:', appSettings);
+    } catch (error: any) {
+      console.error('Error loading settings:', error);
+    }
+  };
 
   const loadUsers = useCallback(async (showLoader = false) => {
     if (showLoader) {
@@ -253,6 +272,27 @@ export default function AdminScreen() {
     return roleLabelMap[roleKey] || role;
   };
 
+  const handleOpenSettings = () => {
+    console.log('User tapped Settings button');
+    setShowSettingsModal(true);
+  };
+
+  const handleSaveSettings = async () => {
+    console.log('User tapped Save Settings button');
+    setSavingSettings(true);
+    try {
+      await jobCardStorage.updateSettings(settings);
+      console.log('Settings saved successfully');
+      alert('Settings saved successfully');
+      setShowSettingsModal(false);
+    } catch (error: any) {
+      console.error('Error saving settings:', error);
+      alert(error.message || 'Failed to save settings');
+    } finally {
+      setSavingSettings(false);
+    }
+  };
+
   if (loading) {
     return (
       <View style={styles.container}>
@@ -275,19 +315,33 @@ export default function AdminScreen() {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.title}>User Management</Text>
-        <TouchableOpacity
-          onPress={handleCreateUser}
-          style={styles.addButton}
-          activeOpacity={0.7}
-        >
-          <IconSymbol
-            ios_icon_name="plus.circle.fill"
-            android_material_icon_name="add-circle"
-            size={28}
-            color={colors.primary}
-          />
-        </TouchableOpacity>
+        <Text style={styles.title}>Admin Console</Text>
+        <View style={styles.headerButtons}>
+          <TouchableOpacity
+            onPress={handleOpenSettings}
+            style={styles.headerButton}
+            activeOpacity={0.7}
+          >
+            <IconSymbol
+              ios_icon_name="gear"
+              android_material_icon_name="settings"
+              size={28}
+              color={colors.primary}
+            />
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={handleCreateUser}
+            style={styles.headerButton}
+            activeOpacity={0.7}
+          >
+            <IconSymbol
+              ios_icon_name="plus.circle.fill"
+              android_material_icon_name="add-circle"
+              size={28}
+              color={colors.primary}
+            />
+          </TouchableOpacity>
+        </View>
       </View>
 
       <View style={styles.statsContainer}>
@@ -536,6 +590,76 @@ export default function AdminScreen() {
           </View>
         </View>
       </Modal>
+
+      {/* Settings Modal */}
+      <Modal visible={showSettingsModal} animationType="slide" transparent>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>App Settings</Text>
+              <TouchableOpacity onPress={() => setShowSettingsModal(false)} activeOpacity={0.7}>
+                <IconSymbol
+                  ios_icon_name="xmark.circle.fill"
+                  android_material_icon_name="cancel"
+                  size={28}
+                  color={colors.textSecondary}
+                />
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.formContainer}>
+              <Text style={styles.settingsDescription}>
+                Configure default rates for job cards. These values will be pre-filled when creating new job cards.
+              </Text>
+
+              <Text style={styles.formLabel}>Default Hourly Labour Rate ($)</Text>
+              <TextInput
+                style={styles.formInput}
+                value={settings.defaultHourlyRate.toString()}
+                onChangeText={(text) => setSettings({ ...settings, defaultHourlyRate: parseFloat(text) || 0 })}
+                placeholder="Enter hourly rate"
+                placeholderTextColor={colors.textSecondary}
+                keyboardType="numeric"
+              />
+
+              <Text style={styles.formLabel}>Default Tax Rate (%)</Text>
+              <TextInput
+                style={styles.formInput}
+                value={settings.defaultTaxRate.toString()}
+                onChangeText={(text) => setSettings({ ...settings, defaultTaxRate: parseFloat(text) || 0 })}
+                placeholder="Enter tax rate percentage"
+                placeholderTextColor={colors.textSecondary}
+                keyboardType="numeric"
+              />
+
+              <View style={styles.settingsPreview}>
+                <Text style={styles.settingsPreviewTitle}>Preview</Text>
+                <View style={styles.settingsPreviewRow}>
+                  <Text style={styles.settingsPreviewLabel}>Hourly Rate:</Text>
+                  <Text style={styles.settingsPreviewValue}>${settings.defaultHourlyRate.toFixed(2)}/hr</Text>
+                </View>
+                <View style={styles.settingsPreviewRow}>
+                  <Text style={styles.settingsPreviewLabel}>Tax Rate:</Text>
+                  <Text style={styles.settingsPreviewValue}>{settings.defaultTaxRate.toFixed(2)}%</Text>
+                </View>
+              </View>
+
+              <TouchableOpacity
+                style={[styles.saveButton, savingSettings && styles.saveButtonDisabled]}
+                onPress={handleSaveSettings}
+                disabled={savingSettings}
+                activeOpacity={0.7}
+              >
+                {savingSettings ? (
+                  <ActivityIndicator color="#FFFFFF" />
+                ) : (
+                  <Text style={styles.saveButtonText}>Save Settings</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -561,7 +685,11 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: colors.text,
   },
-  addButton: {
+  headerButtons: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  headerButton: {
     padding: 8,
   },
   statsContainer: {
@@ -805,5 +933,39 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: '#FFFFFF',
+  },
+  settingsDescription: {
+    fontSize: 14,
+    color: colors.textSecondary,
+    lineHeight: 20,
+    marginBottom: 20,
+  },
+  settingsPreview: {
+    backgroundColor: colors.highlight,
+    borderRadius: 12,
+    padding: 16,
+    marginTop: 20,
+    marginBottom: 20,
+  },
+  settingsPreviewTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: colors.text,
+    marginBottom: 12,
+  },
+  settingsPreviewRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  settingsPreviewLabel: {
+    fontSize: 14,
+    color: colors.textSecondary,
+  },
+  settingsPreviewValue: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: colors.primary,
   },
 });

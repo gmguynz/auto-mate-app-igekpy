@@ -575,28 +575,40 @@ export const jobCardStorage = {
     try {
       if (!this.isConfigured()) {
         console.log('Supabase not configured, returning default settings');
-        return { defaultHourlyRate: 0 };
+        return { defaultHourlyRate: 0, defaultTaxRate: 0 };
       }
 
       return await retryOperation(async () => {
         const { data, error } = await supabase
           .from('app_settings')
           .select('*')
-          .eq('key', 'default_hourly_rate')
-          .single();
+          .in('key', ['default_hourly_rate', 'default_tax_rate']);
 
         if (error && error.code !== 'PGRST116') {
           console.error('Error getting settings from Supabase:', error);
           throw error;
         }
 
-        return {
-          defaultHourlyRate: data ? parseFloat(data.value) : 0,
+        const settings: AppSettings = {
+          defaultHourlyRate: 0,
+          defaultTaxRate: 0,
         };
+
+        if (data) {
+          data.forEach((item: any) => {
+            if (item.key === 'default_hourly_rate') {
+              settings.defaultHourlyRate = parseFloat(item.value) || 0;
+            } else if (item.key === 'default_tax_rate') {
+              settings.defaultTaxRate = parseFloat(item.value) || 0;
+            }
+          });
+        }
+
+        return settings;
       }, 'getSettings');
     } catch (error: any) {
       console.error('Error getting settings:', error);
-      return { defaultHourlyRate: 0 };
+      return { defaultHourlyRate: 0, defaultTaxRate: 0 };
     }
   },
 
@@ -606,13 +618,22 @@ export const jobCardStorage = {
     }
 
     await retryOperation(async () => {
-      const { error } = await supabase
-        .from('app_settings')
-        .upsert({
+      const updates = [
+        {
           key: 'default_hourly_rate',
           value: settings.defaultHourlyRate.toString(),
           updated_at: new Date().toISOString(),
-        }, {
+        },
+        {
+          key: 'default_tax_rate',
+          value: settings.defaultTaxRate.toString(),
+          updated_at: new Date().toISOString(),
+        },
+      ];
+
+      const { error } = await supabase
+        .from('app_settings')
+        .upsert(updates, {
           onConflict: 'key'
         });
 

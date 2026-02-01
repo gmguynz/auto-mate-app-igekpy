@@ -77,4 +77,5 @@ export interface JobCardFormData {
 
 export interface AppSettings {
   defaultHourlyRate: number;
+  defaultTaxRate: number;
 }
