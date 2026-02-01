@@ -133,6 +133,7 @@ export default function JobCardDetailScreen() {
   const createdDate = dateUtils.formatDate(jobCard.createdAt);
   const updatedDate = dateUtils.formatDate(jobCard.updatedAt);
   const completedDate = jobCard.completedAt ? dateUtils.formatDate(jobCard.completedAt) : null;
+  const vehicleMakeModel = `${jobCard.vehicleMake} ${jobCard.vehicleModel}`;
 
   return (
     <View style={styles.container}>
@@ -202,7 +203,7 @@ export default function JobCardDetailScreen() {
           </View>
           <View style={styles.infoRow}>
             <Text style={styles.infoLabel}>Make/Model:</Text>
-            <Text style={styles.infoValue}>{jobCard.vehicleMake} {jobCard.vehicleModel}</Text>
+            <Text style={styles.infoValue}>{vehicleMakeModel}</Text>
           </View>
           {jobCard.vehicleYear && (
             <View style={styles.infoRow}>
@@ -259,22 +260,22 @@ export default function JobCardDetailScreen() {
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Work Description</Text>
             {jobCard.description && (
-              <>
+              <React.Fragment>
                 <Text style={styles.descriptionLabel}>Work Required:</Text>
                 <Text style={styles.descriptionText}>{jobCard.description}</Text>
-              </>
+              </React.Fragment>
             )}
             {jobCard.workDone && (
-              <>
+              <React.Fragment>
                 <Text style={styles.descriptionLabel}>Work Done:</Text>
                 <Text style={styles.descriptionText}>{jobCard.workDone}</Text>
-              </>
+              </React.Fragment>
             )}
             {jobCard.notes && (
-              <>
+              <React.Fragment>
                 <Text style={styles.descriptionLabel}>Notes:</Text>
                 <Text style={styles.descriptionText}>{jobCard.notes}</Text>
-              </>
+              </React.Fragment>
             )}
           </View>
         )}
@@ -283,18 +284,24 @@ export default function JobCardDetailScreen() {
         {jobCard.partsUsed && jobCard.partsUsed.length > 0 && (
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Parts Used</Text>
-            {jobCard.partsUsed.map((part, index) => (
-              <View key={index} style={styles.itemCard}>
-                <View style={styles.itemHeader}>
-                  <Text style={styles.itemName}>{part.partName}</Text>
-                  <Text style={styles.itemPrice}>{formatCurrency(part.quantity * part.pricePerUnit)}</Text>
+            {jobCard.partsUsed.map((part, index) => {
+              const partTotal = formatCurrency(part.quantity * part.pricePerUnit);
+              const partQuantity = `Qty: ${part.quantity}`;
+              const partPrice = `@ ${formatCurrency(part.pricePerUnit)}`;
+              
+              return (
+                <View key={index} style={styles.itemCard}>
+                  <View style={styles.itemHeader}>
+                    <Text style={styles.itemName}>{part.partName}</Text>
+                    <Text style={styles.itemPrice}>{partTotal}</Text>
+                  </View>
+                  <View style={styles.itemDetails}>
+                    <Text style={styles.itemDetailText}>{partQuantity}</Text>
+                    <Text style={styles.itemDetailText}>{partPrice}</Text>
+                  </View>
                 </View>
-                <View style={styles.itemDetails}>
-                  <Text style={styles.itemDetailText}>Qty: {part.quantity}</Text>
-                  <Text style={styles.itemDetailText}>@ {formatCurrency(part.pricePerUnit)}</Text>
-                </View>
-              </View>
-            ))}
+              );
+            })}
           </View>
         )}
 
@@ -302,18 +309,25 @@ export default function JobCardDetailScreen() {
         {jobCard.labourEntries && jobCard.labourEntries.length > 0 && (
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Labour</Text>
-            {jobCard.labourEntries.map((labour, index) => (
-              <View key={index} style={styles.itemCard}>
-                <View style={styles.itemHeader}>
-                  <Text style={styles.itemName}>{labour.description || 'Labour'}</Text>
-                  <Text style={styles.itemPrice}>{formatCurrency(labour.hours * labour.ratePerHour)}</Text>
+            {jobCard.labourEntries.map((labour, index) => {
+              const labourTotal = formatCurrency(labour.hours * labour.ratePerHour);
+              const labourHours = `${labour.hours} hrs`;
+              const labourRate = `@ ${formatCurrency(labour.ratePerHour)}/hr`;
+              const labourDesc = labour.description || 'Labour';
+              
+              return (
+                <View key={index} style={styles.itemCard}>
+                  <View style={styles.itemHeader}>
+                    <Text style={styles.itemName}>{labourDesc}</Text>
+                    <Text style={styles.itemPrice}>{labourTotal}</Text>
+                  </View>
+                  <View style={styles.itemDetails}>
+                    <Text style={styles.itemDetailText}>{labourHours}</Text>
+                    <Text style={styles.itemDetailText}>{labourRate}</Text>
+                  </View>
                 </View>
-                <View style={styles.itemDetails}>
-                  <Text style={styles.itemDetailText}>{labour.hours} hrs</Text>
-                  <Text style={styles.itemDetailText}>@ {formatCurrency(labour.ratePerHour)}/hr</Text>
-                </View>
-              </View>
-            ))}
+              );
+            })}
           </View>
         )}
 

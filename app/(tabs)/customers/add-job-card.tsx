@@ -345,6 +345,7 @@ export default function AddJobCardScreen() {
   const vehicleDisplayName = selectedVehicle
     ? `${selectedVehicle.registrationNumber} - ${selectedVehicle.make} ${selectedVehicle.model}`
     : '';
+  const defaultRateDisplay = formatCurrency(defaultHourlyRate);
 
   return (
     <KeyboardAvoidingView 
@@ -541,45 +542,49 @@ export default function AddJobCardScreen() {
             </TouchableOpacity>
           </View>
 
-          {partsUsed.map((part, index) => (
-            <View key={index} style={styles.itemCard}>
-              <View style={styles.itemHeader}>
-                <Text style={styles.itemName}>{part.partName}</Text>
-                <TouchableOpacity onPress={() => removePartUsed(index)} activeOpacity={0.7}>
-                  <IconSymbol
-                    ios_icon_name="trash.fill"
-                    android_material_icon_name="delete"
-                    size={20}
-                    color={colors.error}
-                  />
-                </TouchableOpacity>
+          {partsUsed.map((part, index) => {
+            const partTotal = formatCurrency(part.quantity * part.pricePerUnit);
+            
+            return (
+              <View key={index} style={styles.itemCard}>
+                <View style={styles.itemHeader}>
+                  <Text style={styles.itemName}>{part.partName}</Text>
+                  <TouchableOpacity onPress={() => removePartUsed(index)} activeOpacity={0.7}>
+                    <IconSymbol
+                      ios_icon_name="trash.fill"
+                      android_material_icon_name="delete"
+                      size={20}
+                      color={colors.error}
+                    />
+                  </TouchableOpacity>
+                </View>
+                <View style={styles.itemRow}>
+                  <View style={styles.itemField}>
+                    <Text style={styles.itemLabel}>Quantity</Text>
+                    <TextInput
+                      style={styles.itemInput}
+                      value={part.quantity.toString()}
+                      onChangeText={(text) => updatePartUsed(index, 'quantity', parseFloat(text) || 0)}
+                      keyboardType="numeric"
+                    />
+                  </View>
+                  <View style={styles.itemField}>
+                    <Text style={styles.itemLabel}>Price</Text>
+                    <TextInput
+                      style={styles.itemInput}
+                      value={part.pricePerUnit.toString()}
+                      onChangeText={(text) => updatePartUsed(index, 'pricePerUnit', parseFloat(text) || 0)}
+                      keyboardType="numeric"
+                    />
+                  </View>
+                  <View style={styles.itemField}>
+                    <Text style={styles.itemLabel}>Total</Text>
+                    <Text style={styles.itemTotal}>{partTotal}</Text>
+                  </View>
+                </View>
               </View>
-              <View style={styles.itemRow}>
-                <View style={styles.itemField}>
-                  <Text style={styles.itemLabel}>Quantity</Text>
-                  <TextInput
-                    style={styles.itemInput}
-                    value={part.quantity.toString()}
-                    onChangeText={(text) => updatePartUsed(index, 'quantity', parseFloat(text) || 0)}
-                    keyboardType="numeric"
-                  />
-                </View>
-                <View style={styles.itemField}>
-                  <Text style={styles.itemLabel}>Price</Text>
-                  <TextInput
-                    style={styles.itemInput}
-                    value={part.pricePerUnit.toString()}
-                    onChangeText={(text) => updatePartUsed(index, 'pricePerUnit', parseFloat(text) || 0)}
-                    keyboardType="numeric"
-                  />
-                </View>
-                <View style={styles.itemField}>
-                  <Text style={styles.itemLabel}>Total</Text>
-                  <Text style={styles.itemTotal}>{formatCurrency(part.quantity * part.pricePerUnit)}</Text>
-                </View>
-              </View>
-            </View>
-          ))}
+            );
+          })}
         </View>
 
         {/* Labour Entries */}
@@ -609,56 +614,60 @@ export default function AddJobCardScreen() {
                 color={colors.primary}
               />
               <Text style={styles.infoText}>
-                Default hourly rate: {formatCurrency(defaultHourlyRate)}/hr
+                Default hourly rate: {defaultRateDisplay}/hr
               </Text>
             </View>
           )}
 
-          {labourEntries.map((labour, index) => (
-            <View key={labour.id} style={styles.itemCard}>
-              <View style={styles.itemHeader}>
-                <TextInput
-                  style={styles.labourDescInput}
-                  value={labour.description}
-                  onChangeText={(text) => updateLabourEntry(index, 'description', text)}
-                  placeholder="Labour description"
-                  placeholderTextColor={colors.textSecondary}
-                />
-                <TouchableOpacity onPress={() => removeLabourEntry(index)} activeOpacity={0.7}>
-                  <IconSymbol
-                    ios_icon_name="trash.fill"
-                    android_material_icon_name="delete"
-                    size={20}
-                    color={colors.error}
-                  />
-                </TouchableOpacity>
-              </View>
-              <View style={styles.itemRow}>
-                <View style={styles.itemField}>
-                  <Text style={styles.itemLabel}>Hours</Text>
+          {labourEntries.map((labour, index) => {
+            const labourTotal = formatCurrency(labour.hours * labour.ratePerHour);
+            
+            return (
+              <View key={labour.id} style={styles.itemCard}>
+                <View style={styles.itemHeader}>
                   <TextInput
-                    style={styles.itemInput}
-                    value={labour.hours.toString()}
-                    onChangeText={(text) => updateLabourEntry(index, 'hours', parseFloat(text) || 0)}
-                    keyboardType="numeric"
+                    style={styles.labourDescInput}
+                    value={labour.description}
+                    onChangeText={(text) => updateLabourEntry(index, 'description', text)}
+                    placeholder="Labour description"
+                    placeholderTextColor={colors.textSecondary}
                   />
+                  <TouchableOpacity onPress={() => removeLabourEntry(index)} activeOpacity={0.7}>
+                    <IconSymbol
+                      ios_icon_name="trash.fill"
+                      android_material_icon_name="delete"
+                      size={20}
+                      color={colors.error}
+                    />
+                  </TouchableOpacity>
                 </View>
-                <View style={styles.itemField}>
-                  <Text style={styles.itemLabel}>Rate/Hr</Text>
-                  <TextInput
-                    style={styles.itemInput}
-                    value={labour.ratePerHour.toString()}
-                    onChangeText={(text) => updateLabourEntry(index, 'ratePerHour', parseFloat(text) || 0)}
-                    keyboardType="numeric"
-                  />
-                </View>
-                <View style={styles.itemField}>
-                  <Text style={styles.itemLabel}>Total</Text>
-                  <Text style={styles.itemTotal}>{formatCurrency(labour.hours * labour.ratePerHour)}</Text>
+                <View style={styles.itemRow}>
+                  <View style={styles.itemField}>
+                    <Text style={styles.itemLabel}>Hours</Text>
+                    <TextInput
+                      style={styles.itemInput}
+                      value={labour.hours.toString()}
+                      onChangeText={(text) => updateLabourEntry(index, 'hours', parseFloat(text) || 0)}
+                      keyboardType="numeric"
+                    />
+                  </View>
+                  <View style={styles.itemField}>
+                    <Text style={styles.itemLabel}>Rate/Hr</Text>
+                    <TextInput
+                      style={styles.itemInput}
+                      value={labour.ratePerHour.toString()}
+                      onChangeText={(text) => updateLabourEntry(index, 'ratePerHour', parseFloat(text) || 0)}
+                      keyboardType="numeric"
+                    />
+                  </View>
+                  <View style={styles.itemField}>
+                    <Text style={styles.itemLabel}>Total</Text>
+                    <Text style={styles.itemTotal}>{labourTotal}</Text>
+                  </View>
                 </View>
               </View>
-            </View>
-          ))}
+            );
+          })}
         </View>
 
         {/* Cost Breakdown */}
@@ -733,25 +742,27 @@ export default function AddJobCardScreen() {
               placeholderTextColor={colors.textSecondary}
             />
             <ScrollView style={styles.modalList}>
-              {getFilteredCustomers().map((customer, index) => (
-                <TouchableOpacity
-                  key={index}
-                  style={styles.modalItem}
-                  onPress={() => {
-                    console.log('User selected customer:', customer.companyName || customer.firstName);
-                    setSelectedCustomer(customer);
-                    setSelectedVehicle(null);
-                    setShowCustomerModal(false);
-                    setCustomerSearch('');
-                  }}
-                  activeOpacity={0.7}
-                >
-                  <Text style={styles.modalItemText}>
-                    {customer.companyName || `${customer.firstName} ${customer.lastName}`.trim()}
-                  </Text>
-                  <Text style={styles.modalItemSubtext}>{customer.email}</Text>
-                </TouchableOpacity>
-              ))}
+              {getFilteredCustomers().map((customer, index) => {
+                const customerName = customer.companyName || `${customer.firstName} ${customer.lastName}`.trim();
+                
+                return (
+                  <TouchableOpacity
+                    key={index}
+                    style={styles.modalItem}
+                    onPress={() => {
+                      console.log('User selected customer:', customerName);
+                      setSelectedCustomer(customer);
+                      setSelectedVehicle(null);
+                      setShowCustomerModal(false);
+                      setCustomerSearch('');
+                    }}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={styles.modalItemText}>{customerName}</Text>
+                    <Text style={styles.modalItemSubtext}>{customer.email}</Text>
+                  </TouchableOpacity>
+                );
+              })}
             </ScrollView>
           </View>
         </View>
@@ -773,23 +784,25 @@ export default function AddJobCardScreen() {
               </TouchableOpacity>
             </View>
             <ScrollView style={styles.modalList}>
-              {selectedCustomer?.vehicles.map((vehicle, index) => (
-                <TouchableOpacity
-                  key={index}
-                  style={styles.modalItem}
-                  onPress={() => {
-                    console.log('User selected vehicle:', vehicle.registrationNumber);
-                    setSelectedVehicle(vehicle);
-                    setShowVehicleModal(false);
-                  }}
-                  activeOpacity={0.7}
-                >
-                  <Text style={styles.modalItemText}>
-                    {vehicle.registrationNumber} - {vehicle.make} {vehicle.model}
-                  </Text>
-                  <Text style={styles.modalItemSubtext}>{vehicle.year}</Text>
-                </TouchableOpacity>
-              ))}
+              {selectedCustomer?.vehicles.map((vehicle, index) => {
+                const vehicleDisplay = `${vehicle.registrationNumber} - ${vehicle.make} ${vehicle.model}`;
+                
+                return (
+                  <TouchableOpacity
+                    key={index}
+                    style={styles.modalItem}
+                    onPress={() => {
+                      console.log('User selected vehicle:', vehicle.registrationNumber);
+                      setSelectedVehicle(vehicle);
+                      setShowVehicleModal(false);
+                    }}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={styles.modalItemText}>{vehicleDisplay}</Text>
+                    <Text style={styles.modalItemSubtext}>{vehicle.year}</Text>
+                  </TouchableOpacity>
+                );
+              })}
             </ScrollView>
           </View>
         </View>
@@ -854,24 +867,27 @@ export default function AddJobCardScreen() {
               placeholderTextColor={colors.textSecondary}
             />
             <ScrollView style={styles.modalList}>
-              {getFilteredParts().map((part, index) => (
-                <TouchableOpacity
-                  key={index}
-                  style={styles.modalItem}
-                  onPress={() => addPartFromModal(part)}
-                  activeOpacity={0.7}
-                >
-                  <View style={styles.partModalItem}>
-                    <View style={styles.partModalLeft}>
-                      <Text style={styles.modalItemText}>{part.name}</Text>
-                      <Text style={styles.modalItemSubtext}>
-                        {part.sku && `SKU: ${part.sku} • `}Stock: {part.stockQuantity}
-                      </Text>
+              {getFilteredParts().map((part, index) => {
+                const partSubtext = part.sku ? `SKU: ${part.sku} • Stock: ${part.stockQuantity}` : `Stock: ${part.stockQuantity}`;
+                const partPriceDisplay = formatCurrency(part.sellPrice);
+                
+                return (
+                  <TouchableOpacity
+                    key={index}
+                    style={styles.modalItem}
+                    onPress={() => addPartFromModal(part)}
+                    activeOpacity={0.7}
+                  >
+                    <View style={styles.partModalItem}>
+                      <View style={styles.partModalLeft}>
+                        <Text style={styles.modalItemText}>{part.name}</Text>
+                        <Text style={styles.modalItemSubtext}>{partSubtext}</Text>
+                      </View>
+                      <Text style={styles.partPrice}>{partPriceDisplay}</Text>
                     </View>
-                    <Text style={styles.partPrice}>{formatCurrency(part.sellPrice)}</Text>
-                  </View>
-                </TouchableOpacity>
-              ))}
+                  </TouchableOpacity>
+                );
+              })}
             </ScrollView>
           </View>
         </View>
