@@ -142,7 +142,7 @@ export default function AddJobCardScreen() {
   const handleBack = () => {
     console.log('User tapped back button, returnTo:', returnTo);
     if (returnTo === 'home') {
-      router.push('/(tabs)/(home)');
+      router.replace('/(tabs)/(home)');
     } else {
       router.back();
     }
@@ -201,7 +201,7 @@ export default function AddJobCardScreen() {
       }
 
       if (returnTo === 'home') {
-        router.push('/(tabs)/(home)');
+        router.replace('/(tabs)/(home)');
       } else {
         router.back();
       }
