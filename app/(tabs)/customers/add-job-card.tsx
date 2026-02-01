@@ -306,8 +306,18 @@ export default function AddJobCardScreen() {
   };
 
   const calculateTotalCost = useMemo(() => {
-    const partsCost = partsUsed.reduce((sum, part) => sum + (part.quantity * part.pricePerUnit), 0);
-    const labourCost = labourEntries.reduce((sum, labour) => sum + (labour.hours * labour.ratePerHour), 0);
+    const partsCost = partsUsed.reduce((sum, part) => {
+      const qty = typeof part.quantity === 'string' ? parseFloat(part.quantity) || 0 : part.quantity;
+      const price = typeof part.pricePerUnit === 'string' ? parseFloat(part.pricePerUnit) || 0 : part.pricePerUnit;
+      return sum + (qty * price);
+    }, 0);
+    
+    const labourCost = labourEntries.reduce((sum, labour) => {
+      const hrs = typeof labour.hours === 'string' ? parseFloat(labour.hours) || 0 : labour.hours;
+      const rate = typeof labour.ratePerHour === 'string' ? parseFloat(labour.ratePerHour) || 0 : labour.ratePerHour;
+      return sum + (hrs * rate);
+    }, 0);
+    
     const subtotal = partsCost + labourCost;
     const taxAmount = subtotal * (defaultTaxRate / 100);
     const totalWithTax = subtotal + taxAmount;
@@ -563,7 +573,11 @@ export default function AddJobCardScreen() {
           </View>
 
           {partsUsed.map((part, index) => {
-            const partTotal = formatCurrency(part.quantity * part.pricePerUnit);
+            const qty = typeof part.quantity === 'string' ? parseFloat(part.quantity) || 0 : part.quantity;
+            const price = typeof part.pricePerUnit === 'string' ? parseFloat(part.pricePerUnit) || 0 : part.pricePerUnit;
+            const partTotal = formatCurrency(qty * price);
+            const qtyDisplay = typeof part.quantity === 'string' ? part.quantity : part.quantity.toString();
+            const priceDisplay = typeof part.pricePerUnit === 'string' ? part.pricePerUnit : part.pricePerUnit.toString();
             
             return (
               <View key={index} style={styles.itemCard}>
@@ -583,8 +597,8 @@ export default function AddJobCardScreen() {
                     <Text style={styles.itemLabel}>Quantity</Text>
                     <TextInput
                       style={styles.itemInput}
-                      value={part.quantity.toString()}
-                      onChangeText={(text) => updatePartUsed(index, 'quantity', parseFloat(text) || 0)}
+                      value={qtyDisplay}
+                      onChangeText={(text) => updatePartUsed(index, 'quantity', text)}
                       keyboardType="decimal-pad"
                     />
                   </View>
@@ -592,8 +606,8 @@ export default function AddJobCardScreen() {
                     <Text style={styles.itemLabel}>Price</Text>
                     <TextInput
                       style={styles.itemInput}
-                      value={part.pricePerUnit.toString()}
-                      onChangeText={(text) => updatePartUsed(index, 'pricePerUnit', parseFloat(text) || 0)}
+                      value={priceDisplay}
+                      onChangeText={(text) => updatePartUsed(index, 'pricePerUnit', text)}
                       keyboardType="decimal-pad"
                     />
                   </View>
@@ -640,7 +654,11 @@ export default function AddJobCardScreen() {
           )}
 
           {labourEntries.map((labour, index) => {
-            const labourTotal = formatCurrency(labour.hours * labour.ratePerHour);
+            const hrs = typeof labour.hours === 'string' ? parseFloat(labour.hours) || 0 : labour.hours;
+            const rate = typeof labour.ratePerHour === 'string' ? parseFloat(labour.ratePerHour) || 0 : labour.ratePerHour;
+            const labourTotal = formatCurrency(hrs * rate);
+            const hoursDisplay = typeof labour.hours === 'string' ? labour.hours : labour.hours.toString();
+            const rateDisplay = typeof labour.ratePerHour === 'string' ? labour.ratePerHour : labour.ratePerHour.toString();
             
             return (
               <View key={labour.id} style={styles.itemCard}>
@@ -666,8 +684,8 @@ export default function AddJobCardScreen() {
                     <Text style={styles.itemLabel}>Hours</Text>
                     <TextInput
                       style={styles.itemInput}
-                      value={labour.hours.toString()}
-                      onChangeText={(text) => updateLabourEntry(index, 'hours', parseFloat(text) || 0)}
+                      value={hoursDisplay}
+                      onChangeText={(text) => updateLabourEntry(index, 'hours', text)}
                       keyboardType="decimal-pad"
                     />
                   </View>
@@ -675,8 +693,8 @@ export default function AddJobCardScreen() {
                     <Text style={styles.itemLabel}>Rate/Hr</Text>
                     <TextInput
                       style={styles.itemInput}
-                      value={labour.ratePerHour.toString()}
-                      onChangeText={(text) => updateLabourEntry(index, 'ratePerHour', parseFloat(text) || 0)}
+                      value={rateDisplay}
+                      onChangeText={(text) => updateLabourEntry(index, 'ratePerHour', text)}
                       keyboardType="decimal-pad"
                     />
                   </View>
