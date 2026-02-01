@@ -3,6 +3,7 @@ import { Tabs } from 'expo-router';
 import { IconSymbol } from '@/components/IconSymbol';
 import { colors } from '@/styles/commonStyles';
 import { useAuth } from '@/contexts/AuthContext';
+import { Platform } from 'react-native';
 
 export default function TabLayout() {
   const { isAdmin } = useAuth();
@@ -17,8 +18,8 @@ export default function TabLayout() {
           backgroundColor: colors.card,
           borderTopColor: colors.border,
           borderTopWidth: 1,
-          height: 60,
-          paddingBottom: 8,
+          height: Platform.OS === 'web' ? 70 : 80,
+          paddingBottom: Platform.OS === 'ios' ? 20 : 12,
           paddingTop: 8,
           boxShadow: '0px -2px 8px rgba(0, 0, 0, 0.08)',
           elevation: 8,
@@ -26,6 +27,11 @@ export default function TabLayout() {
         tabBarLabelStyle: {
           fontSize: 12,
           fontWeight: '600',
+          marginTop: 4,
+          marginBottom: Platform.OS === 'ios' ? 0 : 4,
+        },
+        tabBarIconStyle: {
+          marginTop: 4,
         },
       }}
     >

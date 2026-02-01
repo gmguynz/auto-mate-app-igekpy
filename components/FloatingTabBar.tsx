@@ -1,3 +1,4 @@
+
 import React from 'react';
 import {
   View,
@@ -176,12 +177,11 @@ export default function FloatingTabBar({
               return (
                 <React.Fragment key={index}>
                 <TouchableOpacity
-                  key={index} // Use index as key
                   style={styles.tab}
                   onPress={() => handleTabPress(tab.route)}
                   activeOpacity={0.7}
                 >
-                  <View key={index} style={styles.tabContent}>
+                  <View style={styles.tabContent}>
                     <IconSymbol
                       android_material_icon_name={tab.icon}
                       ios_icon_name={tab.icon}
@@ -194,6 +194,9 @@ export default function FloatingTabBar({
                         { color: theme.dark ? '#98989D' : '#8E8E93' },
                         isActive && { color: theme.colors.primary, fontWeight: '600' },
                       ]}
+                      numberOfLines={1}
+                      adjustsFontSizeToFit
+                      minimumFontScale={0.8}
                     >
                       {tab.label}
                     </Text>
@@ -242,25 +245,30 @@ const styles = StyleSheet.create({
   },
   tabsContainer: {
     flexDirection: 'row',
-    height: 60,
+    height: 68,
     alignItems: 'center',
     paddingHorizontal: 4,
+    paddingVertical: 6,
   },
   tab: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 8,
+    paddingHorizontal: 4,
   },
   tabContent: {
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 2,
+    gap: 4,
+    minHeight: 52,
   },
   tabLabel: {
-    fontSize: 9,
+    fontSize: 11,
     fontWeight: '500',
     marginTop: 2,
+    textAlign: 'center',
+    lineHeight: 14,
     // Dynamic styling applied in component
   },
 });
