@@ -34,6 +34,7 @@ export default function AddJobCardScreen() {
   const [technicians, setTechnicians] = useState<Array<{ id: string; name: string; email: string }>>([]);
   const [parts, setParts] = useState<Part[]>([]);
   const [defaultHourlyRate, setDefaultHourlyRate] = useState(0);
+  const [defaultTaxRate, setDefaultTaxRate] = useState(0);
   
   // Form state
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
@@ -82,6 +83,9 @@ export default function AddJobCardScreen() {
       setTechnicians(techniciansData);
       setParts(partsData);
       setDefaultHourlyRate(settings.defaultHourlyRate);
+      setDefaultTaxRate(settings.defaultTaxRate);
+      
+      console.log('Settings loaded - Hourly Rate:', settings.defaultHourlyRate, 'Tax Rate:', settings.defaultTaxRate);
       
       // If editing, load job card
       if (jobCardId) {
@@ -235,7 +239,7 @@ export default function AddJobCardScreen() {
   };
 
   const addLabourEntry = () => {
-    console.log('User tapped Add Labour Entry button');
+    console.log('User tapped Add Labour Entry button - using default rate:', defaultHourlyRate);
     const newEntry: JobCardLabour = {
       id: Date.now().toString(),
       description: '',
@@ -284,7 +288,17 @@ export default function AddJobCardScreen() {
   const calculateTotalCost = () => {
     const partsCost = partsUsed.reduce((sum, part) => sum + (part.quantity * part.pricePerUnit), 0);
     const labourCost = labourEntries.reduce((sum, labour) => sum + (labour.hours * labour.ratePerHour), 0);
-    return partsCost + labourCost;
+    const subtotal = partsCost + labourCost;
+    const taxAmount = subtotal * (defaultTaxRate / 100);
+    const totalWithTax = subtotal + taxAmount;
+    
+    return {
+      partsCost,
+      labourCost,
+      subtotal,
+      taxAmount,
+      totalWithTax,
+    };
   };
 
   const getFilteredCustomers = () => {
@@ -323,7 +337,7 @@ export default function AddJobCardScreen() {
     );
   }
 
-  const totalCost = calculateTotalCost();
+  const costBreakdown = calculateTotalCost();
   const selectedTechnician = technicians.find(t => t.id === selectedTechnicianId);
   const customerDisplayName = selectedCustomer 
     ? (selectedCustomer.companyName || `${selectedCustomer.firstName} ${selectedCustomer.lastName}`.trim())
@@ -647,10 +661,38 @@ export default function AddJobCardScreen() {
           ))}
         </View>
 
-        {/* Total Cost */}
-        <View style={styles.totalSection}>
-          <Text style={styles.totalLabel}>Total Cost</Text>
-          <Text style={styles.totalValue}>{formatCurrency(totalCost)}</Text>
+        {/* Cost Breakdown */}
+        <View style={styles.costBreakdownSection}>
+          <Text style={styles.costBreakdownTitle}>Cost Breakdown</Text>
+          
+          <View style={styles.costRow}>
+            <Text style={styles.costLabel}>Parts:</Text>
+            <Text style={styles.costValue}>{formatCurrency(costBreakdown.partsCost)}</Text>
+          </View>
+          
+          <View style={styles.costRow}>
+            <Text style={styles.costLabel}>Labour:</Text>
+            <Text style={styles.costValue}>{formatCurrency(costBreakdown.labourCost)}</Text>
+          </View>
+          
+          <View style={styles.costDivider} />
+          
+          <View style={styles.costRow}>
+            <Text style={styles.costLabel}>Subtotal:</Text>
+            <Text style={styles.costValue}>{formatCurrency(costBreakdown.subtotal)}</Text>
+          </View>
+          
+          <View style={styles.costRow}>
+            <Text style={styles.costLabel}>Tax ({defaultTaxRate}%):</Text>
+            <Text style={styles.costValue}>{formatCurrency(costBreakdown.taxAmount)}</Text>
+          </View>
+          
+          <View style={styles.costDivider} />
+          
+          <View style={styles.costRow}>
+            <Text style={styles.costLabelTotal}>Total:</Text>
+            <Text style={styles.costValueTotal}>{formatCurrency(costBreakdown.totalWithTax)}</Text>
+          </View>
         </View>
 
         {/* Save Button */}
@@ -1052,24 +1094,49 @@ const styles = StyleSheet.create({
     color: colors.primary,
     paddingTop: 8,
   },
-  totalSection: {
+  costBreakdownSection: {
     backgroundColor: colors.card,
-    borderWidth: 2,
-    borderColor: colors.primary,
+    borderWidth: 1,
+    borderColor: colors.border,
     borderRadius: 12,
     padding: 20,
     marginBottom: 24,
-    alignItems: 'center',
   },
-  totalLabel: {
+  costBreakdownTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: colors.text,
+    marginBottom: 16,
+  },
+  costRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  costLabel: {
     fontSize: 16,
     color: colors.textSecondary,
-    marginBottom: 8,
   },
-  totalValue: {
-    fontSize: 32,
+  costValue: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: colors.text,
+  },
+  costLabelTotal: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: colors.text,
+  },
+  costValueTotal: {
+    fontSize: 24,
     fontWeight: 'bold',
     color: colors.primary,
+  },
+  costDivider: {
+    height: 1,
+    backgroundColor: colors.border,
+    marginVertical: 12,
   },
   saveButton: {
     backgroundColor: colors.primary,
