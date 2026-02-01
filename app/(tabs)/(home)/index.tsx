@@ -179,8 +179,9 @@ export default function HomeScreen() {
   const filteredCustomers = getFilteredCustomers();
   const fullName = profile?.full_name || user?.email?.split('@')[0] || 'User';
   const firstName = fullName.split(' ')[0];
+  const dashboardTitle = "Charlie's Workshop Dashboard";
   const welcomeText = 'Welcome back,';
-  const greeting = `${welcomeText} ${firstName}`;
+  const welcomeMessage = `${welcomeText} ${firstName}`;
 
   return (
     <View style={styles.container}>
@@ -192,9 +193,9 @@ export default function HomeScreen() {
       >
         <View style={styles.header}>
           <View style={styles.headerTop}>
-            <View>
-              <Text style={styles.greeting}>{greeting}</Text>
-              <Text style={styles.subtitle}>Charlie&apos;s Workshop Dashboard</Text>
+            <View style={styles.headerTextContainer}>
+              <Text style={styles.dashboardTitle}>{dashboardTitle}</Text>
+              <Text style={styles.welcomeMessage}>{welcomeMessage}</Text>
             </View>
             {isAdmin && (
               <View style={styles.adminBadge}>
@@ -536,14 +537,18 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'flex-start',
   },
-  greeting: {
-    fontSize: 28,
-    fontWeight: '700',
-    color: colors.text,
-    marginBottom: 4,
+  headerTextContainer: {
+    flex: 1,
+    marginRight: 12,
   },
-  subtitle: {
-    fontSize: 15,
+  dashboardTitle: {
+    fontSize: 32,
+    fontWeight: '800',
+    color: colors.text,
+    marginBottom: 6,
+  },
+  welcomeMessage: {
+    fontSize: 16,
     color: colors.textSecondary,
     fontWeight: '500',
   },
