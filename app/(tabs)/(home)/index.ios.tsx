@@ -9,6 +9,8 @@ import { storageUtils } from '@/utils/storage';
 import { SupabaseSetupGuide } from '@/components/SupabaseSetupGuide';
 import { dateUtils } from '@/utils/dateUtils';
 import { Customer } from '@/types/customer';
+import { jobCardStorage } from '@/utils/jobCardStorage';
+import { JobCard } from '@/types/jobCard';
 
 export default function HomeScreen() {
   const router = useRouter();
@@ -17,6 +19,8 @@ export default function HomeScreen() {
   const [customerCount, setCustomerCount] = useState(0);
   const [vehicleCount, setVehicleCount] = useState(0);
   const [reminderCount, setReminderCount] = useState(0);
+  const [activeJobCardsCount, setActiveJobCardsCount] = useState(0);
+  const [activeJobCardsTotal, setActiveJobCardsTotal] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isAboutExpanded, setIsAboutExpanded] = useState(false);
@@ -67,13 +71,23 @@ export default function HomeScreen() {
 
       const reminders = getUpcomingReminders(customers);
       setReminderCount(reminders);
+
+      // Load active job cards
+      const jobCards = await jobCardStorage.getJobCards();
+      const activeJobCards = jobCards.filter(jc => jc.status === 'open' || jc.status === 'in_progress');
+      setActiveJobCardsCount(activeJobCards.length);
       
-      console.log(`Loaded ${customers.length} customers, ${totalVehicles} vehicles, ${reminders} reminders`);
+      const totalValue = activeJobCards.reduce((sum, jc) => sum + jc.totalCost, 0);
+      setActiveJobCardsTotal(totalValue);
+      
+      console.log(`Loaded ${customers.length} customers, ${totalVehicles} vehicles, ${reminders} reminders, ${activeJobCards.length} active job cards`);
     } catch (err) {
       console.error('Error loading counts:', err);
       setCustomerCount(0);
       setVehicleCount(0);
       setReminderCount(0);
+      setActiveJobCardsCount(0);
+      setActiveJobCardsTotal(0);
     }
   };
 
@@ -129,6 +143,10 @@ export default function HomeScreen() {
         },
       ]
     );
+  };
+
+  const formatCurrency = (amount: number): string => {
+    return `$${amount.toFixed(2)}`;
   };
 
   if (showSetupGuide) {
@@ -216,6 +234,58 @@ export default function HomeScreen() {
               <Text style={styles.actionTitle}>Add New Customer</Text>
               <Text style={styles.actionDescription}>
                 Create a new customer record with vehicle details
+              </Text>
+            </View>
+            <IconSymbol
+              ios_icon_name="chevron.right"
+              android_material_icon_name="chevron-right"
+              size={20}
+              color={colors.textSecondary}
+            />
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.actionCard}
+            onPress={() => router.push('/customers/add-job-card')}
+          >
+            <View style={styles.actionIcon}>
+              <IconSymbol
+                ios_icon_name="doc.text.fill"
+                android_material_icon_name="description"
+                size={24}
+                color={colors.success}
+              />
+            </View>
+            <View style={styles.actionContent}>
+              <Text style={styles.actionTitle}>Create Job Card</Text>
+              <Text style={styles.actionDescription}>
+                Start a new job card for a customer vehicle
+              </Text>
+            </View>
+            <IconSymbol
+              ios_icon_name="chevron.right"
+              android_material_icon_name="chevron-right"
+              size={20}
+              color={colors.textSecondary}
+            />
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.actionCard}
+            onPress={() => router.push('/customers/job-cards')}
+          >
+            <View style={styles.actionIcon}>
+              <IconSymbol
+                ios_icon_name="list.bullet.clipboard"
+                android_material_icon_name="assignment"
+                size={24}
+                color={colors.accent}
+              />
+            </View>
+            <View style={styles.actionContent}>
+              <Text style={styles.actionTitle}>View Job Cards</Text>
+              <Text style={styles.actionDescription}>
+                Browse all job cards and their status
               </Text>
             </View>
             <IconSymbol
@@ -326,6 +396,24 @@ export default function HomeScreen() {
             <Text style={styles.statNumber}>{reminderCount}</Text>
             <Text style={styles.statLabel}>Reminders</Text>
             <Text style={styles.statSubLabel}>(14 days)</Text>
+          </TouchableOpacity>
+        </View>
+
+        <View style={styles.statsContainer}>
+          <TouchableOpacity
+            style={[styles.statCard, styles.jobCardStatCard]}
+            onPress={() => router.push('/customers/job-cards')}
+            activeOpacity={0.7}
+          >
+            <IconSymbol
+              ios_icon_name="doc.text.fill"
+              android_material_icon_name="description"
+              size={28}
+              color="#FF9800"
+            />
+            <Text style={styles.statNumber}>{activeJobCardsCount}</Text>
+            <Text style={styles.statLabel}>Active Jobs</Text>
+            <Text style={styles.statValue}>{formatCurrency(activeJobCardsTotal)}</Text>
           </TouchableOpacity>
         </View>
 
@@ -550,6 +638,10 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
   },
+  jobCardStatCard: {
+    backgroundColor: '#FFF3E0',
+    borderColor: '#FFB74D',
+  },
   statNumber: {
     fontSize: 24,
     fontWeight: 'bold',
@@ -567,6 +659,12 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     marginTop: 2,
     textAlign: 'center',
+  },
+  statValue: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#FF9800',
+    marginTop: 4,
   },
   infoSection: {
     backgroundColor: colors.card,
