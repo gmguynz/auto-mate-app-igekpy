@@ -58,6 +58,7 @@ export default function AddJobCardScreen() {
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [datePickerField, setDatePickerField] = useState<'wof' | 'service' | null>(null);
   const [tempDate, setTempDate] = useState(new Date());
+  const [webDateInput, setWebDateInput] = useState('');
   
   // Search states
   const [customerSearch, setCustomerSearch] = useState('');
@@ -161,7 +162,7 @@ export default function AddJobCardScreen() {
         vehicleId: selectedVehicle.id,
         technicianId: selectedTechnicianId,
         vinNumber: vinNumber.trim() || undefined,
-        odometer: odometer ? parseInt(odometer) : undefined,
+        odometer: odometer ? parseFloat(odometer) : undefined,
         wofExpiry: wofExpiry || undefined,
         serviceDueDate: serviceDueDate || undefined,
         description: description.trim() || undefined,
@@ -230,11 +231,30 @@ export default function AddJobCardScreen() {
     setDatePickerField(null);
   };
 
+  const handleWebDatePickerDone = () => {
+    if (datePickerField && webDateInput) {
+      if (datePickerField === 'wof') {
+        setWofExpiry(webDateInput);
+      } else {
+        setServiceDueDate(webDateInput);
+      }
+    }
+    setShowDatePicker(false);
+    setDatePickerField(null);
+    setWebDateInput('');
+  };
+
   const showDatePickerFor = (field: 'wof' | 'service') => {
     console.log(`User tapped ${field} date picker`);
     setDatePickerField(field);
     const currentDate = field === 'wof' ? wofExpiry : serviceDueDate;
-    setTempDate(currentDate ? new Date(currentDate) : new Date());
+    
+    if (Platform.OS === 'web') {
+      setWebDateInput(currentDate || '');
+    } else {
+      setTempDate(currentDate ? new Date(currentDate) : new Date());
+    }
+    
     setShowDatePicker(true);
   };
 
@@ -448,7 +468,8 @@ export default function AddJobCardScreen() {
             onChangeText={setOdometer}
             placeholder="Enter odometer reading"
             placeholderTextColor={colors.textSecondary}
-            keyboardType="decimal-pad"
+            keyboardType="numeric"
+            inputMode="decimal"
           />
 
           <Text style={styles.label}>WOF Expiry</Text>
@@ -565,7 +586,8 @@ export default function AddJobCardScreen() {
                       style={styles.itemInput}
                       value={part.quantity.toString()}
                       onChangeText={(text) => updatePartUsed(index, 'quantity', parseFloat(text) || 0)}
-                      keyboardType="decimal-pad"
+                      keyboardType="numeric"
+                      inputMode="decimal"
                     />
                   </View>
                   <View style={styles.itemField}>
@@ -574,7 +596,8 @@ export default function AddJobCardScreen() {
                       style={styles.itemInput}
                       value={part.pricePerUnit.toString()}
                       onChangeText={(text) => updatePartUsed(index, 'pricePerUnit', parseFloat(text) || 0)}
-                      keyboardType="decimal-pad"
+                      keyboardType="numeric"
+                      inputMode="decimal"
                     />
                   </View>
                   <View style={styles.itemField}>
@@ -648,7 +671,8 @@ export default function AddJobCardScreen() {
                       style={styles.itemInput}
                       value={labour.hours.toString()}
                       onChangeText={(text) => updateLabourEntry(index, 'hours', parseFloat(text) || 0)}
-                      keyboardType="decimal-pad"
+                      keyboardType="numeric"
+                      inputMode="decimal"
                     />
                   </View>
                   <View style={styles.itemField}>
@@ -657,7 +681,8 @@ export default function AddJobCardScreen() {
                       style={styles.itemInput}
                       value={labour.ratePerHour.toString()}
                       onChangeText={(text) => updateLabourEntry(index, 'ratePerHour', parseFloat(text) || 0)}
-                      keyboardType="decimal-pad"
+                      keyboardType="numeric"
+                      inputMode="decimal"
                     />
                   </View>
                   <View style={styles.itemField}>
@@ -893,9 +918,37 @@ export default function AddJobCardScreen() {
         </View>
       </Modal>
 
-      {/* Date Picker */}
+      {/* Date Picker - Platform Specific */}
       {showDatePicker && (
-        Platform.OS === 'ios' ? (
+        Platform.OS === 'web' ? (
+          <Modal visible={showDatePicker} animationType="slide" transparent>
+            <View style={styles.modalOverlay}>
+              <View style={styles.datePickerModal}>
+                <View style={styles.datePickerHeader}>
+                  <TouchableOpacity onPress={() => { setShowDatePicker(false); setDatePickerField(null); setWebDateInput(''); }} activeOpacity={0.7}>
+                    <Text style={styles.datePickerCancel}>Cancel</Text>
+                  </TouchableOpacity>
+                  <Text style={styles.datePickerTitle}>
+                    {datePickerField === 'wof' ? 'WOF Expiry Date' : 'Service Due Date'}
+                  </Text>
+                  <TouchableOpacity onPress={handleWebDatePickerDone} activeOpacity={0.7}>
+                    <Text style={styles.datePickerDone}>Done</Text>
+                  </TouchableOpacity>
+                </View>
+                <View style={styles.webDatePickerContent}>
+                  <TextInput
+                    style={styles.webDateInput}
+                    value={webDateInput}
+                    onChangeText={setWebDateInput}
+                    placeholder="YYYY-MM-DD"
+                    placeholderTextColor={colors.textSecondary}
+                  />
+                  <Text style={styles.webDateHint}>Enter date in format: YYYY-MM-DD (e.g., 2024-12-31)</Text>
+                </View>
+              </View>
+            </View>
+          </Modal>
+        ) : Platform.OS === 'ios' ? (
           <Modal visible={showDatePicker} animationType="slide" transparent>
             <View style={styles.modalOverlay}>
               <View style={styles.datePickerModal}>
@@ -1249,9 +1302,15 @@ const styles = StyleSheet.create({
   datePickerHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    alignItems: 'center',
     padding: 16,
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
+  },
+  datePickerTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: colors.text,
   },
   datePickerCancel: {
     fontSize: 16,
@@ -1261,5 +1320,24 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: colors.primary,
+  },
+  webDatePickerContent: {
+    padding: 20,
+  },
+  webDateInput: {
+    backgroundColor: colors.card,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 8,
+    padding: 16,
+    fontSize: 18,
+    color: colors.text,
+    textAlign: 'center',
+    marginBottom: 12,
+  },
+  webDateHint: {
+    fontSize: 14,
+    color: colors.textSecondary,
+    textAlign: 'center',
   },
 });
