@@ -13,476 +13,253 @@ import {
   RefreshControl,
   Platform,
 } from 'react-native';
-import { useAuth } from '@/contexts/AuthContext';
-import { supabase } from '@/integrations/supabase/client';
+import { useRouter } from 'expo-router';
 import { colors } from '@/styles/commonStyles';
 import { IconSymbol } from '@/components/IconSymbol';
-import { useRouter } from 'expo-router';
+import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/integrations/supabase/client';
 
 interface UserProfile {
   id: string;
   email: string;
   full_name: string | null;
   user_id: string | null;
-  role: 'admin' | 'user';
+  role: 'admin' | 'user' | 'technician';
   created_at: string;
   updated_at: string;
 }
 
 export default function AdminScreen() {
-  const { isAdmin, profile } = useAuth();
   const router = useRouter();
+  const { user, isAdmin } = useAuth();
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
-  const [editingUser, setEditingUser] = useState<UserProfile | null>(null);
-  const [newUserEmail, setNewUserEmail] = useState('');
-  const [newUserPassword, setNewUserPassword] = useState('');
-  const [newUserFullName, setNewUserFullName] = useState('');
-  const [newUserId, setNewUserId] = useState('');
-  const [newUserRole, setNewUserRole] = useState<'admin' | 'user'>('user');
+  const [selectedUser, setSelectedUser] = useState<UserProfile | null>(null);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [showRoleModal, setShowRoleModal] = useState(false);
+  
+  // Form state
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [fullName, setFullName] = useState('');
+  const [role, setRole] = useState<'admin' | 'user' | 'technician'>('user');
   const [creating, setCreating] = useState(false);
   const [updating, setUpdating] = useState(false);
 
   useEffect(() => {
     if (!isAdmin) {
-      Alert.alert('Access Denied', 'You do not have permission to access this page.');
-      router.replace('/(tabs)');
+      console.log('User is not admin, redirecting to home');
+      router.replace('/');
       return;
     }
-    loadUsers();
+    loadUsers(true);
   }, [isAdmin]);
 
-  const loadUsers = async (showLoader = true) => {
+  const loadUsers = useCallback(async (showLoader = false) => {
+    if (showLoader) {
+      setLoading(true);
+    }
     try {
-      if (showLoader) {
-        setLoading(true);
-      }
       console.log('Loading users...');
-      const startTime = Date.now();
-      
       const { data, error } = await supabase
         .from('user_profiles')
-        .select('id, email, full_name, user_id, role, created_at, updated_at')
+        .select('*')
         .order('created_at', { ascending: false });
-
-      const endTime = Date.now();
-      console.log(`Loaded ${data?.length || 0} users in ${endTime - startTime}ms`);
 
       if (error) {
         console.error('Error loading users:', error);
-        Alert.alert('Error', 'Failed to load users');
-        return;
+        throw error;
       }
 
+      console.log(`Loaded ${data?.length || 0} users`);
       setUsers(data || []);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error loading users:', error);
-      Alert.alert('Error', 'Failed to load users');
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  };
-
-  const onRefresh = useCallback(() => {
-    setRefreshing(true);
-    loadUsers(false);
   }, []);
 
-  const handleCreateUser = async () => {
-    if (!newUserEmail || !newUserPassword || !newUserFullName) {
-      Alert.alert('Error', 'Please fill in all required fields');
-      return;
-    }
-
-    if (newUserPassword.length < 6) {
-      Alert.alert('Error', 'Password must be at least 6 characters');
-      return;
-    }
-
-    if (newUserId && newUserId.length < 3) {
-      Alert.alert('Error', 'User ID must be at least 3 characters');
-      return;
-    }
-
-    setCreating(true);
-    
-    // Store current session to restore it after user creation
-    const { data: currentSession } = await supabase.auth.getSession();
-    const currentAccessToken = currentSession?.session?.access_token;
-    const currentRefreshToken = currentSession?.session?.refresh_token;
-    
-    try {
-      console.log('Creating user with email:', newUserEmail);
-      
-      // Create user with metadata - the database trigger will create the profile automatically
-      const { data, error } = await supabase.auth.signUp({
-        email: newUserEmail,
-        password: newUserPassword,
-        options: {
-          data: {
-            full_name: newUserFullName,
-            user_id: newUserId || null,
-            role: newUserRole,
-          },
-          emailRedirectTo: 'https://natively.dev/email-confirmed',
-        },
-      });
-
-      if (error) {
-        console.error('Error creating user:', error);
-        
-        // Check if it's an SMTP configuration error
-        if (error.message && (
-          error.message.includes('Error sending confirmation email') ||
-          error.message.includes('SMTP') ||
-          error.message.includes('API key not found')
-        )) {
-          Alert.alert(
-            'Email Configuration Issue',
-            'The user account was created successfully, but the confirmation email could not be sent.\n\n' +
-            'This is because SMTP is not properly configured with your Resend API key.\n\n' +
-            'To fix this:\n' +
-            '1. Go to your Supabase project dashboard\n' +
-            '2. Navigate to Project Settings > Auth\n' +
-            '3. Scroll to SMTP Settings\n' +
-            '4. Configure with your Resend SMTP credentials\n\n' +
-            'Alternatively, you can disable email confirmation in Authentication > Providers > Email to allow users to log in immediately without verification.',
-            [
-              {
-                text: 'OK',
-                onPress: async () => {
-                  // Restore the admin session
-                  if (currentAccessToken && currentRefreshToken) {
-                    await supabase.auth.setSession({
-                      access_token: currentAccessToken,
-                      refresh_token: currentRefreshToken,
-                    });
-                  }
-                  
-                  setShowCreateModal(false);
-                  setNewUserEmail('');
-                  setNewUserPassword('');
-                  setNewUserFullName('');
-                  setNewUserId('');
-                  setNewUserRole('user');
-                  loadUsers(false);
-                },
-              },
-            ]
-          );
-          return;
-        }
-        
-        // Restore admin session on error
-        if (currentAccessToken && currentRefreshToken) {
-          await supabase.auth.setSession({
-            access_token: currentAccessToken,
-            refresh_token: currentRefreshToken,
-          });
-        }
-        
-        Alert.alert('Error', error.message || 'Failed to create user');
-        return;
-      }
-
-      if (data.user) {
-        console.log('User created successfully:', data.user.id);
-        
-        // If email confirmation is disabled, the user will be auto-logged in
-        // We need to restore the admin session
-        if (data.session) {
-          console.log('User was auto-logged in, restoring admin session...');
-          
-          // Restore the admin session
-          if (currentAccessToken && currentRefreshToken) {
-            await supabase.auth.setSession({
-              access_token: currentAccessToken,
-              refresh_token: currentRefreshToken,
-            });
-            console.log('Admin session restored');
-          }
-        }
-
-        // Update the user_id in the profile if provided
-        if (newUserId) {
-          console.log('Updating user_id in profile...');
-          const { error: updateError } = await supabase
-            .from('user_profiles')
-            .update({ user_id: newUserId })
-            .eq('id', data.user.id);
-
-          if (updateError) {
-            console.error('Error updating user_id:', updateError);
-            // Don't fail the whole operation, just log it
-          }
-        }
-      }
-
-      // Check if email confirmation is required
-      const confirmationRequired = !data.session;
-      
-      Alert.alert(
-        'Success',
-        confirmationRequired
-          ? `User created successfully!\n\nAn email verification link has been sent to ${newUserEmail}. The user must verify their email before they can log in.${newUserId ? `\n\nUser ID: ${newUserId}` : ''}`
-          : `User created successfully!\n\nThe user can now log in with their email and password.${newUserId ? `\n\nUser ID: ${newUserId}` : ''}`,
-        [
-          {
-            text: 'OK',
-            onPress: () => {
-              setShowCreateModal(false);
-              setNewUserEmail('');
-              setNewUserPassword('');
-              setNewUserFullName('');
-              setNewUserId('');
-              setNewUserRole('user');
-              loadUsers(false);
-            },
-          },
-        ]
-      );
-    } catch (error: any) {
-      console.error('Error creating user:', error);
-      
-      // Restore admin session on error
-      if (currentAccessToken && currentRefreshToken) {
-        await supabase.auth.setSession({
-          access_token: currentAccessToken,
-          refresh_token: currentRefreshToken,
-        });
-      }
-      
-      // Check if it's an SMTP error
-      if (error.message && (
-        error.message.includes('SMTP') || 
-        error.message.includes('email') ||
-        error.message.includes('API key not found')
-      )) {
-        Alert.alert(
-          'Email Configuration Issue',
-          'Unable to send confirmation email. Please configure SMTP with your Resend API key in your Supabase project settings or disable email confirmation.',
-          [
-            {
-              text: 'OK',
-              onPress: () => {
-                setShowCreateModal(false);
-                setNewUserEmail('');
-                setNewUserPassword('');
-                setNewUserFullName('');
-                setNewUserId('');
-                setNewUserRole('user');
-                loadUsers(false);
-              },
-            },
-          ]
-        );
-      } else {
-        Alert.alert('Error', 'Failed to create user. Please try again.');
-      }
-    } finally {
-      setCreating(false);
-    }
+  const handleCreateUser = () => {
+    console.log('User tapped Create User button');
+    setEmail('');
+    setPassword('');
+    setFullName('');
+    setRole('user');
+    setShowCreateModal(true);
   };
 
   const handleEditUser = (user: UserProfile) => {
-    setEditingUser(user);
-    setNewUserFullName(user.full_name || '');
-    setNewUserId(user.user_id || '');
-    setNewUserRole(user.role);
+    console.log('User tapped Edit User button for:', user.email);
+    setSelectedUser(user);
+    setFullName(user.full_name || '');
+    setRole(user.role);
     setShowEditModal(true);
   };
 
   const handleUpdateUser = async () => {
-    if (!editingUser) return;
+    if (!selectedUser) return;
 
-    if (!newUserFullName) {
-      Alert.alert('Error', 'Full name is required');
-      return;
-    }
-
-    if (newUserId && newUserId.length < 3) {
-      Alert.alert('Error', 'User ID must be at least 3 characters');
-      return;
-    }
-
+    console.log('User tapped Update User button');
     setUpdating(true);
     try {
       const { error } = await supabase
         .from('user_profiles')
         .update({
-          full_name: newUserFullName,
-          user_id: newUserId || null,
-          role: newUserRole,
+          full_name: fullName.trim() || null,
+          role: role,
           updated_at: new Date().toISOString(),
         })
-        .eq('id', editingUser.id);
+        .eq('id', selectedUser.id);
 
       if (error) {
         console.error('Error updating user:', error);
-        Alert.alert('Error', error.message || 'Failed to update user');
-        return;
+        throw error;
       }
 
-      Alert.alert(
-        'Success',
-        'User updated successfully. The user will need to log out and log back in for role changes to take effect.',
-        [
-          {
-            text: 'OK',
-            onPress: () => {
-              setShowEditModal(false);
-              setEditingUser(null);
-              setNewUserFullName('');
-              setNewUserId('');
-              setNewUserRole('user');
-              loadUsers(false);
-            },
-          },
-        ]
-      );
-    } catch (error) {
+      console.log('User updated successfully');
+      setShowEditModal(false);
+      setSelectedUser(null);
+      loadUsers(false);
+    } catch (error: any) {
       console.error('Error updating user:', error);
-      Alert.alert('Error', 'Failed to update user');
+      alert(error.message || 'Failed to update user');
     } finally {
       setUpdating(false);
     }
   };
 
   const handleSendPasswordReset = async (userEmail: string) => {
-    Alert.alert(
-      'Send Password Reset',
-      `Send a password reset email to ${userEmail}?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Send',
-          onPress: async () => {
-            try {
-              console.log('Sending password reset email to:', userEmail);
-              const { data, error } = await supabase.auth.resetPasswordForEmail(
-                userEmail,
-                {
-                  redirectTo: 'https://natively.dev/email-confirmed',
-                }
-              );
+    console.log('User tapped Send Password Reset for:', userEmail);
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(userEmail, {
+        redirectTo: `${window.location.origin}/reset-password`,
+      });
 
-              if (error) {
-                console.error('Password reset email error:', error);
-                Alert.alert('Error', error.message || 'Failed to send reset email');
-              } else {
-                console.log('Password reset email sent successfully');
-                Alert.alert(
-                  'Email Sent',
-                  `A password reset link has been sent to ${userEmail}. The user should check their inbox and spam folder.`
-                );
-              }
-            } catch (error) {
-              console.error('Password reset email error:', error);
-              Alert.alert('Error', 'Failed to send reset email');
-            }
-          },
-        },
-      ]
-    );
+      if (error) {
+        console.error('Error sending password reset:', error);
+        throw error;
+      }
+
+      alert(`Password reset email sent to ${userEmail}`);
+    } catch (error: any) {
+      console.error('Error sending password reset:', error);
+      alert(error.message || 'Failed to send password reset email');
+    }
   };
 
   const handleDeleteUser = async (userId: string, userEmail: string) => {
-    if (userId === profile?.id) {
-      Alert.alert('Error', 'You cannot delete your own account');
-      return;
+    console.log('User tapped Delete User button for:', userEmail);
+    const userToDelete = users.find(u => u.id === userId);
+    if (!userToDelete) return;
+    
+    setSelectedUser(userToDelete);
+    setShowDeleteModal(true);
+  };
+
+  const confirmDeleteUser = async () => {
+    if (!selectedUser) return;
+
+    console.log('User confirmed delete for:', selectedUser.email);
+    try {
+      // Delete user profile
+      const { error: profileError } = await supabase
+        .from('user_profiles')
+        .delete()
+        .eq('id', selectedUser.id);
+
+      if (profileError) {
+        console.error('Error deleting user profile:', profileError);
+        throw profileError;
+      }
+
+      // Delete auth user (requires admin privileges)
+      const { error: authError } = await supabase.auth.admin.deleteUser(selectedUser.id);
+
+      if (authError) {
+        console.error('Error deleting auth user:', authError);
+        // Continue anyway as profile is deleted
+      }
+
+      console.log('User deleted successfully');
+      setShowDeleteModal(false);
+      setSelectedUser(null);
+      loadUsers(false);
+    } catch (error: any) {
+      console.error('Error deleting user:', error);
+      alert(error.message || 'Failed to delete user');
     }
-
-    Alert.alert(
-      'Delete User',
-      `Are you sure you want to delete ${userEmail}? This action cannot be undone.`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              console.log('Deleting user:', userId);
-              const { error } = await supabase
-                .from('user_profiles')
-                .delete()
-                .eq('id', userId);
-
-              if (error) {
-                console.error('Error deleting user:', error);
-                Alert.alert('Error', 'Failed to delete user');
-                return;
-              }
-
-              console.log('User deleted successfully');
-              Alert.alert('Success', 'User deleted successfully');
-              loadUsers(false);
-            } catch (error) {
-              console.error('Error deleting user:', error);
-              Alert.alert('Error', 'Failed to delete user');
-            }
-          },
-        },
-      ]
-    );
   };
 
   const handleToggleRole = async (userId: string, currentRole: string, userEmail: string) => {
-    if (userId === profile?.id) {
-      Alert.alert('Error', 'You cannot change your own role');
-      return;
-    }
-
-    const newRole = currentRole === 'admin' ? 'user' : 'admin';
-
-    Alert.alert(
-      'Change Role',
-      `Change ${userEmail} role from ${currentRole} to ${newRole}?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Change',
-          onPress: async () => {
-            try {
-              console.log('Changing role for user:', userId, 'to', newRole);
-              const { error } = await supabase
-                .from('user_profiles')
-                .update({ role: newRole, updated_at: new Date().toISOString() })
-                .eq('id', userId);
-
-              if (error) {
-                console.error('Error updating role:', error);
-                Alert.alert('Error', 'Failed to update role');
-                return;
-              }
-
-              console.log('Role updated successfully');
-              Alert.alert(
-                'Success', 
-                'Role updated successfully. The user will need to log out and log back in for the changes to take effect.'
-              );
-              loadUsers(false);
-            } catch (error) {
-              console.error('Error updating role:', error);
-              Alert.alert('Error', 'Failed to update role');
-            }
-          },
-        },
-      ]
-    );
+    console.log('User tapped Toggle Role for:', userEmail);
+    const userToUpdate = users.find(u => u.id === userId);
+    if (!userToUpdate) return;
+    
+    setSelectedUser(userToUpdate);
+    setRole(userToUpdate.role);
+    setShowRoleModal(true);
   };
 
-  if (!isAdmin) {
-    return null;
-  }
+  const confirmRoleChange = async () => {
+    if (!selectedUser) return;
+
+    console.log('User confirmed role change to:', role);
+    try {
+      const { error } = await supabase
+        .from('user_profiles')
+        .update({
+          role: role,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', selectedUser.id);
+
+      if (error) {
+        console.error('Error updating user role:', error);
+        throw error;
+      }
+
+      console.log('User role updated successfully');
+      setShowRoleModal(false);
+      setSelectedUser(null);
+      loadUsers(false);
+    } catch (error: any) {
+      console.error('Error updating user role:', error);
+      alert(error.message || 'Failed to update user role');
+    }
+  };
+
+  const getRoleBadgeColor = (role: string) => {
+    const roleColorMap = {
+      admin: colors.error,
+      technician: colors.accent,
+      user: colors.primary,
+    };
+    const roleKey = role as keyof typeof roleColorMap;
+    return roleColorMap[roleKey] || colors.textSecondary;
+  };
+
+  const getRoleLabel = (role: string) => {
+    const roleLabelMap = {
+      admin: 'Admin',
+      technician: 'Technician',
+      user: 'User',
+    };
+    const roleKey = role as keyof typeof roleLabelMap;
+    return roleLabelMap[roleKey] || role;
+  };
 
   if (loading) {
     return (
       <View style={styles.container}>
+        <View style={styles.header}>
+          <Text style={styles.title}>User Management</Text>
+          <View style={{ width: 40 }} />
+        </View>
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={colors.primary} />
           <Text style={styles.loadingText}>Loading users...</Text>
@@ -491,294 +268,128 @@ export default function AdminScreen() {
     );
   }
 
+  const adminCount = users.filter(u => u.role === 'admin').length;
+  const technicianCount = users.filter(u => u.role === 'technician').length;
+  const userCount = users.filter(u => u.role === 'user').length;
+
   return (
     <View style={styles.container}>
-      <ScrollView
-        style={styles.scrollView}
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={onRefresh}
-            tintColor={colors.primary}
-            colors={[colors.primary]}
-          />
-        }
-      >
-        <View style={styles.header}>
-          <Text style={styles.title}>User Management</Text>
-          <Text style={styles.subtitle}>Manage user accounts and permissions</Text>
-        </View>
-
+      <View style={styles.header}>
+        <Text style={styles.title}>User Management</Text>
         <TouchableOpacity
-          style={styles.createButton}
-          onPress={() => setShowCreateModal(true)}
+          onPress={handleCreateUser}
+          style={styles.addButton}
           activeOpacity={0.7}
         >
           <IconSymbol
-            ios_icon_name="person.badge.plus.fill"
-            android_material_icon_name="person-add"
-            size={24}
-            color="#FFFFFF"
+            ios_icon_name="plus.circle.fill"
+            android_material_icon_name="add-circle"
+            size={28}
+            color={colors.primary}
           />
-          <Text style={styles.createButtonText}>Create New User</Text>
         </TouchableOpacity>
+      </View>
 
-        <View style={styles.statsContainer}>
-          <View style={styles.statCard}>
-            <Text style={styles.statNumber}>{users.length}</Text>
-            <Text style={styles.statLabel}>Total Users</Text>
-          </View>
-          <View style={styles.statCard}>
-            <Text style={styles.statNumber}>
-              {users.filter((u) => u.role === 'admin').length}
-            </Text>
-            <Text style={styles.statLabel}>Admins</Text>
-          </View>
-          <View style={styles.statCard}>
-            <Text style={styles.statNumber}>
-              {users.filter((u) => u.role === 'user').length}
-            </Text>
-            <Text style={styles.statLabel}>Users</Text>
-          </View>
+      <View style={styles.statsContainer}>
+        <View style={styles.statCard}>
+          <Text style={styles.statValue}>{adminCount}</Text>
+          <Text style={styles.statLabel}>Admins</Text>
         </View>
+        <View style={styles.statCard}>
+          <Text style={styles.statValue}>{technicianCount}</Text>
+          <Text style={styles.statLabel}>Technicians</Text>
+        </View>
+        <View style={styles.statCard}>
+          <Text style={styles.statValue}>{userCount}</Text>
+          <Text style={styles.statLabel}>Users</Text>
+        </View>
+      </View>
 
-        <View style={styles.usersList}>
-          <Text style={styles.sectionTitle}>All Users</Text>
-          {users.map((user, index) => (
-            <React.Fragment key={user.id || `user-${index}`}>
-              <View style={styles.userCard}>
+      <ScrollView
+        style={styles.scrollView}
+        contentContainerStyle={styles.scrollContent}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); loadUsers(false); }} tintColor={colors.primary} />}
+        showsVerticalScrollIndicator={false}
+      >
+        {users.map((userProfile, index) => (
+          <React.Fragment key={index}>
+            <View style={styles.userCard}>
+              <View style={styles.userHeader}>
                 <View style={styles.userInfo}>
-                  <View style={styles.userAvatar}>
-                    <IconSymbol
-                      ios_icon_name="person.fill"
-                      android_material_icon_name="person"
-                      size={24}
-                      color={colors.primary}
-                    />
-                  </View>
-                  <View style={styles.userDetails}>
-                    <Text style={styles.userName}>{user.full_name || 'No name'}</Text>
-                    <Text style={styles.userEmail}>{user.email}</Text>
-                    {user.user_id && (
-                      <Text style={styles.userIdText}>User ID: {user.user_id}</Text>
-                    )}
-                    <View style={styles.roleBadge}>
-                      <Text
-                        style={[
-                          styles.roleText,
-                          user.role === 'admin' && styles.roleTextAdmin,
-                        ]}
-                      >
-                        {user.role.toUpperCase()}
-                      </Text>
-                    </View>
-                  </View>
+                  <Text style={styles.userName}>{userProfile.full_name || userProfile.email}</Text>
+                  <Text style={styles.userEmail}>{userProfile.email}</Text>
                 </View>
-                <View style={styles.userActions}>
-                  <TouchableOpacity
-                    style={styles.actionButton}
-                    onPress={() => handleEditUser(user)}
-                    activeOpacity={0.7}
-                  >
-                    <IconSymbol
-                      ios_icon_name="pencil"
-                      android_material_icon_name="edit"
-                      size={20}
-                      color={colors.primary}
-                    />
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={styles.actionButton}
-                    onPress={() => handleSendPasswordReset(user.email)}
-                    activeOpacity={0.7}
-                  >
-                    <IconSymbol
-                      ios_icon_name="envelope.fill"
-                      android_material_icon_name="email"
-                      size={20}
-                      color={colors.primary}
-                    />
-                  </TouchableOpacity>
-                  {user.id !== profile?.id && (
-                    <>
-                      <TouchableOpacity
-                        style={styles.actionButton}
-                        onPress={() => handleToggleRole(user.id, user.role, user.email)}
-                        activeOpacity={0.7}
-                      >
-                        <IconSymbol
-                          ios_icon_name="arrow.2.squarepath"
-                          android_material_icon_name="swap-horiz"
-                          size={20}
-                          color={colors.primary}
-                        />
-                      </TouchableOpacity>
-                      <TouchableOpacity
-                        style={[styles.actionButton, styles.deleteButton]}
-                        onPress={() => handleDeleteUser(user.id, user.email)}
-                        activeOpacity={0.7}
-                      >
-                        <IconSymbol
-                          ios_icon_name="trash.fill"
-                          android_material_icon_name="delete"
-                          size={20}
-                          color="#FF3B30"
-                        />
-                      </TouchableOpacity>
-                    </>
-                  )}
+                <View style={[styles.roleBadge, { backgroundColor: getRoleBadgeColor(userProfile.role) }]}>
+                  <Text style={styles.roleText}>{getRoleLabel(userProfile.role)}</Text>
                 </View>
               </View>
-            </React.Fragment>
-          ))}
-        </View>
+
+              <View style={styles.userActions}>
+                <TouchableOpacity
+                  style={styles.actionButton}
+                  onPress={() => handleEditUser(userProfile)}
+                  activeOpacity={0.7}
+                >
+                  <IconSymbol
+                    ios_icon_name="pencil"
+                    android_material_icon_name="edit"
+                    size={20}
+                    color={colors.primary}
+                  />
+                  <Text style={styles.actionButtonText}>Edit</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.actionButton}
+                  onPress={() => handleToggleRole(userProfile.id, userProfile.role, userProfile.email)}
+                  activeOpacity={0.7}
+                >
+                  <IconSymbol
+                    ios_icon_name="person.badge.key"
+                    android_material_icon_name="admin-panel-settings"
+                    size={20}
+                    color={colors.accent}
+                  />
+                  <Text style={styles.actionButtonText}>Role</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.actionButton}
+                  onPress={() => handleSendPasswordReset(userProfile.email)}
+                  activeOpacity={0.7}
+                >
+                  <IconSymbol
+                    ios_icon_name="key.fill"
+                    android_material_icon_name="vpn-key"
+                    size={20}
+                    color={colors.textSecondary}
+                  />
+                  <Text style={styles.actionButtonText}>Reset</Text>
+                </TouchableOpacity>
+
+                {userProfile.id !== user?.id && (
+                  <TouchableOpacity
+                    style={styles.actionButton}
+                    onPress={() => handleDeleteUser(userProfile.id, userProfile.email)}
+                    activeOpacity={0.7}
+                  >
+                    <IconSymbol
+                      ios_icon_name="trash.fill"
+                      android_material_icon_name="delete"
+                      size={20}
+                      color={colors.error}
+                    />
+                    <Text style={[styles.actionButtonText, { color: colors.error }]}>Delete</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+            </View>
+          </React.Fragment>
+        ))}
       </ScrollView>
 
-      {/* Create User Modal */}
-      <Modal
-        visible={showCreateModal}
-        animationType="slide"
-        transparent={true}
-        onRequestClose={() => setShowCreateModal(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Create New User</Text>
-              <TouchableOpacity onPress={() => setShowCreateModal(false)} activeOpacity={0.7}>
-                <IconSymbol
-                  ios_icon_name="xmark.circle.fill"
-                  android_material_icon_name="close"
-                  size={28}
-                  color={colors.textSecondary}
-                />
-              </TouchableOpacity>
-            </View>
-
-            <ScrollView style={styles.modalScroll}>
-              <View style={styles.inputContainer}>
-                <Text style={styles.label}>Full Name *</Text>
-                <TextInput
-                  style={styles.input}
-                  placeholder="Enter full name"
-                  placeholderTextColor={colors.textSecondary}
-                  value={newUserFullName}
-                  onChangeText={setNewUserFullName}
-                  editable={!creating}
-                />
-              </View>
-
-              <View style={styles.inputContainer}>
-                <Text style={styles.label}>Email *</Text>
-                <TextInput
-                  style={styles.input}
-                  placeholder="Enter email address"
-                  placeholderTextColor={colors.textSecondary}
-                  value={newUserEmail}
-                  onChangeText={setNewUserEmail}
-                  autoCapitalize="none"
-                  keyboardType="email-address"
-                  editable={!creating}
-                />
-              </View>
-
-              <View style={styles.inputContainer}>
-                <Text style={styles.label}>User ID (optional)</Text>
-                <TextInput
-                  style={styles.input}
-                  placeholder="Enter custom user ID for login"
-                  placeholderTextColor={colors.textSecondary}
-                  value={newUserId}
-                  onChangeText={setNewUserId}
-                  autoCapitalize="none"
-                  editable={!creating}
-                />
-                <Text style={styles.helperText}>
-                  User can log in with either email or this custom ID
-                </Text>
-              </View>
-
-              <View style={styles.inputContainer}>
-                <Text style={styles.label}>Password *</Text>
-                <TextInput
-                  style={styles.input}
-                  placeholder="Enter password (min 6 characters)"
-                  placeholderTextColor={colors.textSecondary}
-                  value={newUserPassword}
-                  onChangeText={setNewUserPassword}
-                  secureTextEntry
-                  editable={!creating}
-                />
-              </View>
-
-              <View style={styles.inputContainer}>
-                <Text style={styles.label}>Role *</Text>
-                <View style={styles.roleSelector}>
-                  <TouchableOpacity
-                    style={[
-                      styles.roleOption,
-                      newUserRole === 'user' && styles.roleOptionSelected,
-                    ]}
-                    onPress={() => setNewUserRole('user')}
-                    disabled={creating}
-                    activeOpacity={0.7}
-                  >
-                    <Text
-                      style={[
-                        styles.roleOptionText,
-                        newUserRole === 'user' && styles.roleOptionTextSelected,
-                      ]}
-                    >
-                      User
-                    </Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={[
-                      styles.roleOption,
-                      newUserRole === 'admin' && styles.roleOptionSelected,
-                    ]}
-                    onPress={() => setNewUserRole('admin')}
-                    disabled={creating}
-                    activeOpacity={0.7}
-                  >
-                    <Text
-                      style={[
-                        styles.roleOptionText,
-                        newUserRole === 'admin' && styles.roleOptionTextSelected,
-                      ]}
-                    >
-                      Admin
-                    </Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-
-              <TouchableOpacity
-                style={[styles.submitButton, creating && styles.submitButtonDisabled]}
-                onPress={handleCreateUser}
-                disabled={creating}
-                activeOpacity={0.7}
-              >
-                {creating ? (
-                  <ActivityIndicator color="#FFFFFF" />
-                ) : (
-                  <Text style={styles.submitButtonText}>Create User</Text>
-                )}
-              </TouchableOpacity>
-            </ScrollView>
-          </View>
-        </View>
-      </Modal>
-
       {/* Edit User Modal */}
-      <Modal
-        visible={showEditModal}
-        animationType="slide"
-        transparent={true}
-        onRequestClose={() => setShowEditModal(false)}
-      >
+      <Modal visible={showEditModal} animationType="slide" transparent>
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
@@ -786,100 +397,50 @@ export default function AdminScreen() {
               <TouchableOpacity onPress={() => setShowEditModal(false)} activeOpacity={0.7}>
                 <IconSymbol
                   ios_icon_name="xmark.circle.fill"
-                  android_material_icon_name="close"
+                  android_material_icon_name="cancel"
                   size={28}
                   color={colors.textSecondary}
                 />
               </TouchableOpacity>
             </View>
 
-            <ScrollView style={styles.modalScroll}>
-              <View style={styles.inputContainer}>
-                <Text style={styles.label}>Email (read-only)</Text>
-                <TextInput
-                  style={[styles.input, styles.inputDisabled]}
-                  value={editingUser?.email}
-                  editable={false}
-                />
-              </View>
+            <View style={styles.formContainer}>
+              <Text style={styles.formLabel}>Full Name</Text>
+              <TextInput
+                style={styles.formInput}
+                value={fullName}
+                onChangeText={setFullName}
+                placeholder="Enter full name"
+                placeholderTextColor={colors.textSecondary}
+              />
 
-              <View style={styles.inputContainer}>
-                <Text style={styles.label}>Full Name *</Text>
-                <TextInput
-                  style={styles.input}
-                  placeholder="Enter full name"
-                  placeholderTextColor={colors.textSecondary}
-                  value={newUserFullName}
-                  onChangeText={setNewUserFullName}
-                  editable={!updating}
-                />
-              </View>
-
-              <View style={styles.inputContainer}>
-                <Text style={styles.label}>User ID (optional)</Text>
-                <TextInput
-                  style={styles.input}
-                  placeholder="Enter custom user ID for login"
-                  placeholderTextColor={colors.textSecondary}
-                  value={newUserId}
-                  onChangeText={setNewUserId}
-                  autoCapitalize="none"
-                  editable={!updating}
-                />
-                <Text style={styles.helperText}>
-                  User can log in with either email or this custom ID
-                </Text>
-              </View>
-
-              <View style={styles.inputContainer}>
-                <Text style={styles.label}>Role *</Text>
-                <View style={styles.roleSelector}>
-                  <TouchableOpacity
-                    style={[
-                      styles.roleOption,
-                      newUserRole === 'user' && styles.roleOptionSelected,
-                    ]}
-                    onPress={() => setNewUserRole('user')}
-                    disabled={updating || editingUser?.id === profile?.id}
-                    activeOpacity={0.7}
-                  >
-                    <Text
-                      style={[
-                        styles.roleOptionText,
-                        newUserRole === 'user' && styles.roleOptionTextSelected,
-                      ]}
-                    >
-                      User
-                    </Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={[
-                      styles.roleOption,
-                      newUserRole === 'admin' && styles.roleOptionSelected,
-                    ]}
-                    onPress={() => setNewUserRole('admin')}
-                    disabled={updating || editingUser?.id === profile?.id}
-                    activeOpacity={0.7}
-                  >
-                    <Text
-                      style={[
-                        styles.roleOptionText,
-                        newUserRole === 'admin' && styles.roleOptionTextSelected,
-                      ]}
-                    >
-                      Admin
-                    </Text>
-                  </TouchableOpacity>
-                </View>
-                {editingUser?.id === profile?.id && (
-                  <Text style={styles.helperText}>
-                    You cannot change your own role
-                  </Text>
-                )}
+              <Text style={styles.formLabel}>Role</Text>
+              <View style={styles.roleSelector}>
+                <TouchableOpacity
+                  style={[styles.roleOption, role === 'user' && styles.roleOptionActive]}
+                  onPress={() => setRole('user')}
+                  activeOpacity={0.7}
+                >
+                  <Text style={[styles.roleOptionText, role === 'user' && styles.roleOptionTextActive]}>User</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.roleOption, role === 'technician' && styles.roleOptionActive]}
+                  onPress={() => setRole('technician')}
+                  activeOpacity={0.7}
+                >
+                  <Text style={[styles.roleOptionText, role === 'technician' && styles.roleOptionTextActive]}>Technician</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.roleOption, role === 'admin' && styles.roleOptionActive]}
+                  onPress={() => setRole('admin')}
+                  activeOpacity={0.7}
+                >
+                  <Text style={[styles.roleOptionText, role === 'admin' && styles.roleOptionTextActive]}>Admin</Text>
+                </TouchableOpacity>
               </View>
 
               <TouchableOpacity
-                style={[styles.submitButton, updating && styles.submitButtonDisabled]}
+                style={[styles.saveButton, updating && styles.saveButtonDisabled]}
                 onPress={handleUpdateUser}
                 disabled={updating}
                 activeOpacity={0.7}
@@ -887,10 +448,91 @@ export default function AdminScreen() {
                 {updating ? (
                   <ActivityIndicator color="#FFFFFF" />
                 ) : (
-                  <Text style={styles.submitButtonText}>Update User</Text>
+                  <Text style={styles.saveButtonText}>Update User</Text>
                 )}
               </TouchableOpacity>
-            </ScrollView>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Role Change Modal */}
+      <Modal visible={showRoleModal} animationType="fade" transparent>
+        <View style={styles.deleteModalOverlay}>
+          <View style={styles.deleteModal}>
+            <Text style={styles.deleteModalTitle}>Change User Role</Text>
+            <Text style={styles.deleteModalText}>
+              Select a new role for {selectedUser?.email}
+            </Text>
+
+            <View style={styles.roleSelector}>
+              <TouchableOpacity
+                style={[styles.roleOption, role === 'user' && styles.roleOptionActive]}
+                onPress={() => setRole('user')}
+                activeOpacity={0.7}
+              >
+                <Text style={[styles.roleOptionText, role === 'user' && styles.roleOptionTextActive]}>User</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.roleOption, role === 'technician' && styles.roleOptionActive]}
+                onPress={() => setRole('technician')}
+                activeOpacity={0.7}
+              >
+                <Text style={[styles.roleOptionText, role === 'technician' && styles.roleOptionTextActive]}>Technician</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.roleOption, role === 'admin' && styles.roleOptionActive]}
+                onPress={() => setRole('admin')}
+                activeOpacity={0.7}
+              >
+                <Text style={[styles.roleOptionText, role === 'admin' && styles.roleOptionTextActive]}>Admin</Text>
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.deleteModalButtons}>
+              <TouchableOpacity
+                style={styles.deleteModalCancel}
+                onPress={() => setShowRoleModal(false)}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.deleteModalCancelText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.deleteModalConfirm}
+                onPress={confirmRoleChange}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.deleteModalConfirmText}>Change Role</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Delete Confirmation Modal */}
+      <Modal visible={showDeleteModal} animationType="fade" transparent>
+        <View style={styles.deleteModalOverlay}>
+          <View style={styles.deleteModal}>
+            <Text style={styles.deleteModalTitle}>Delete User?</Text>
+            <Text style={styles.deleteModalText}>
+              Are you sure you want to delete {selectedUser?.email}? This action cannot be undone.
+            </Text>
+            <View style={styles.deleteModalButtons}>
+              <TouchableOpacity
+                style={styles.deleteModalCancel}
+                onPress={() => setShowDeleteModal(false)}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.deleteModalCancelText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.deleteModalConfirm}
+                onPress={confirmDeleteUser}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.deleteModalConfirmText}>Delete</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
       </Modal>
@@ -903,59 +545,30 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.background,
   },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  loadingText: {
-    marginTop: 12,
-    fontSize: 16,
-    color: colors.textSecondary,
-  },
-  scrollView: {
-    flex: 1,
-  },
-  scrollContent: {
-    padding: 20,
-    paddingTop: 60,
-    paddingBottom: 100,
-  },
   header: {
-    marginBottom: 24,
-  },
-  title: {
-    fontSize: 32,
-    fontWeight: 'bold',
-    color: colors.text,
-    marginBottom: 4,
-  },
-  subtitle: {
-    fontSize: 16,
-    color: colors.textSecondary,
-  },
-  createButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: colors.primary,
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 24,
-    gap: 8,
-    cursor: Platform.OS === 'web' ? 'pointer' : undefined,
-    userSelect: Platform.OS === 'web' ? 'none' : undefined,
+    justifyContent: 'space-between',
+    paddingTop: 60,
+    paddingHorizontal: 20,
+    paddingBottom: 16,
+    backgroundColor: colors.card,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
   },
-  createButtonText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '600',
-    userSelect: Platform.OS === 'web' ? 'none' : undefined,
+  title: {
+    fontSize: 28,
+    fontWeight: 'bold',
+    color: colors.text,
+  },
+  addButton: {
+    padding: 8,
   },
   statsContainer: {
     flexDirection: 'row',
-    gap: 10,
-    marginBottom: 24,
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    gap: 12,
   },
   statCard: {
     flex: 1,
@@ -966,29 +579,34 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
   },
-  statNumber: {
-    fontSize: 28,
+  statValue: {
+    fontSize: 24,
     fontWeight: 'bold',
-    color: colors.text,
+    color: colors.primary,
     marginBottom: 4,
   },
   statLabel: {
     fontSize: 12,
     color: colors.textSecondary,
   },
-  usersList: {
-    marginBottom: 24,
+  scrollView: {
+    flex: 1,
   },
-  sectionTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: colors.text,
-    marginBottom: 12,
+  scrollContent: {
+    padding: 20,
+    paddingBottom: 100,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    fontSize: 16,
+    color: colors.textSecondary,
+    marginTop: 12,
   },
   userCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
     backgroundColor: colors.card,
     borderRadius: 12,
     padding: 16,
@@ -996,71 +614,56 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
   },
-  userInfo: {
+  userHeader: {
     flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-    gap: 12,
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 12,
   },
-  userAvatar: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: colors.highlight,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  userDetails: {
+  userInfo: {
     flex: 1,
   },
   userName: {
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: 'bold',
     color: colors.text,
-    marginBottom: 2,
+    marginBottom: 4,
   },
   userEmail: {
     fontSize: 14,
     color: colors.textSecondary,
-    marginBottom: 2,
-  },
-  userIdText: {
-    fontSize: 12,
-    color: colors.textSecondary,
-    fontStyle: 'italic',
-    marginBottom: 4,
   },
   roleBadge: {
-    alignSelf: 'flex-start',
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 4,
-    backgroundColor: colors.highlight,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 12,
+    marginLeft: 12,
   },
   roleText: {
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: '600',
-    color: colors.textSecondary,
-  },
-  roleTextAdmin: {
-    color: colors.primary,
+    color: '#FFFFFF',
   },
   userActions: {
     flexDirection: 'row',
     gap: 8,
+    flexWrap: 'wrap',
   },
   actionButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: colors.highlight,
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    cursor: Platform.OS === 'web' ? 'pointer' : undefined,
-    userSelect: Platform.OS === 'web' ? 'none' : undefined,
+    backgroundColor: colors.background,
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    gap: 6,
+    borderWidth: 1,
+    borderColor: colors.border,
   },
-  deleteButton: {
-    backgroundColor: '#FFE5E5',
+  actionButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.text,
   },
   modalOverlay: {
     flex: 1,
@@ -1069,14 +672,15 @@ const styles = StyleSheet.create({
   },
   modalContent: {
     backgroundColor: colors.background,
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    maxHeight: '90%',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    maxHeight: '80%',
+    paddingBottom: 40,
   },
   modalHeader: {
     flexDirection: 'row',
-    alignItems: 'center',
     justifyContent: 'space-between',
+    alignItems: 'center',
     padding: 20,
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
@@ -1086,82 +690,120 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: colors.text,
   },
-  modalScroll: {
+  formContainer: {
     padding: 20,
   },
-  inputContainer: {
-    marginBottom: 20,
-  },
-  label: {
+  formLabel: {
     fontSize: 14,
     fontWeight: '600',
     color: colors.text,
     marginBottom: 8,
+    marginTop: 12,
   },
-  input: {
+  formInput: {
     backgroundColor: colors.card,
-    borderRadius: 12,
     borderWidth: 1,
     borderColor: colors.border,
-    padding: 16,
+    borderRadius: 8,
+    padding: 12,
     fontSize: 16,
     color: colors.text,
-    cursor: Platform.OS === 'web' ? 'text' : undefined,
-    outlineStyle: Platform.OS === 'web' ? 'none' : undefined,
-  },
-  inputDisabled: {
-    opacity: 0.6,
-    backgroundColor: colors.highlight,
-  },
-  helperText: {
-    fontSize: 12,
-    color: colors.textSecondary,
-    marginTop: 4,
   },
   roleSelector: {
     flexDirection: 'row',
-    gap: 12,
+    gap: 8,
+    marginBottom: 20,
   },
   roleOption: {
     flex: 1,
-    padding: 16,
-    borderRadius: 12,
-    borderWidth: 2,
+    backgroundColor: colors.card,
+    borderWidth: 1,
     borderColor: colors.border,
+    borderRadius: 8,
+    padding: 12,
     alignItems: 'center',
-    cursor: Platform.OS === 'web' ? 'pointer' : undefined,
-    userSelect: Platform.OS === 'web' ? 'none' : undefined,
   },
-  roleOptionSelected: {
+  roleOptionActive: {
+    backgroundColor: colors.primary,
     borderColor: colors.primary,
-    backgroundColor: colors.highlight,
   },
   roleOptionText: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: '600',
-    color: colors.textSecondary,
-    userSelect: Platform.OS === 'web' ? 'none' : undefined,
+    color: colors.text,
   },
-  roleOptionTextSelected: {
-    color: colors.primary,
+  roleOptionTextActive: {
+    color: '#FFFFFF',
   },
-  submitButton: {
+  saveButton: {
     backgroundColor: colors.primary,
     borderRadius: 12,
     padding: 16,
     alignItems: 'center',
     marginTop: 12,
-    cursor: Platform.OS === 'web' ? 'pointer' : undefined,
-    userSelect: Platform.OS === 'web' ? 'none' : undefined,
   },
-  submitButtonDisabled: {
+  saveButtonDisabled: {
     opacity: 0.6,
-    cursor: Platform.OS === 'web' ? 'not-allowed' : undefined,
   },
-  submitButtonText: {
+  saveButtonText: {
+    fontSize: 18,
+    fontWeight: 'bold',
     color: '#FFFFFF',
+  },
+  deleteModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  deleteModal: {
+    backgroundColor: colors.card,
+    borderRadius: 16,
+    padding: 24,
+    width: '100%',
+    maxWidth: 400,
+  },
+  deleteModalTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: colors.text,
+    marginBottom: 12,
+  },
+  deleteModalText: {
+    fontSize: 16,
+    color: colors.textSecondary,
+    lineHeight: 24,
+    marginBottom: 24,
+  },
+  deleteModalButtons: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  deleteModalCancel: {
+    flex: 1,
+    backgroundColor: colors.background,
+    borderRadius: 8,
+    padding: 14,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  deleteModalCancelText: {
     fontSize: 16,
     fontWeight: '600',
-    userSelect: Platform.OS === 'web' ? 'none' : undefined,
+    color: colors.text,
+  },
+  deleteModalConfirm: {
+    flex: 1,
+    backgroundColor: colors.error,
+    borderRadius: 8,
+    padding: 14,
+    alignItems: 'center',
+  },
+  deleteModalConfirmText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#FFFFFF',
   },
 });

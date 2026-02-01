@@ -34,7 +34,7 @@ export interface UserProfile {
   email: string;
   full_name: string | null;
   user_id: string | null;
-  role: 'admin' | 'user';
+  role: 'admin' | 'user' | 'technician';
   created_at: string;
   updated_at: string;
 }

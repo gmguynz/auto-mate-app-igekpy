@@ -1,6 +1,6 @@
 
 import { supabase, isSupabaseConfigured } from '@/integrations/supabase/client';
-import { JobCard } from '@/types/jobCard';
+import { JobCard, Part, JobCardPart, JobCardLabour } from '@/types/jobCard';
 import { Customer } from '@/types/customer';
 
 // Retry configuration
@@ -89,7 +89,10 @@ export const jobCardStorage = {
       return await retryOperation(async () => {
         const { data, error } = await supabase
           .from('job_cards')
-          .select('*')
+          .select(`
+            *,
+            technician:user_profiles!job_cards_technician_id_fkey(full_name)
+          `)
           .order('created_at', { ascending: false });
 
         if (error) {
@@ -109,9 +112,17 @@ export const jobCardStorage = {
           vehicleMake: item.vehicle_make || '',
           vehicleModel: item.vehicle_model || '',
           vehicleYear: item.vehicle_year || '',
+          technicianId: item.technician_id || undefined,
+          technicianName: item.technician?.full_name || undefined,
+          vinNumber: item.vin_number || undefined,
+          odometer: item.odometer || undefined,
+          wofExpiry: item.wof_expiry || undefined,
+          serviceDueDate: item.service_due_date || undefined,
           status: item.status,
           description: item.description || '',
           notes: item.notes || '',
+          partsUsed: item.parts_used || [],
+          labourEntries: item.labour_entries || [],
           labourCost: parseFloat(item.labour_cost || '0'),
           partsCost: parseFloat(item.parts_cost || '0'),
           totalCost: parseFloat(item.total_cost || '0'),
@@ -137,7 +148,10 @@ export const jobCardStorage = {
       return await retryOperation(async () => {
         const { data, error } = await supabase
           .from('job_cards')
-          .select('*')
+          .select(`
+            *,
+            technician:user_profiles!job_cards_technician_id_fkey(full_name)
+          `)
           .eq('id', jobCardId)
           .single();
 
@@ -160,9 +174,17 @@ export const jobCardStorage = {
           vehicleMake: data.vehicle_make || '',
           vehicleModel: data.vehicle_model || '',
           vehicleYear: data.vehicle_year || '',
+          technicianId: data.technician_id || undefined,
+          technicianName: data.technician?.full_name || undefined,
+          vinNumber: data.vin_number || undefined,
+          odometer: data.odometer || undefined,
+          wofExpiry: data.wof_expiry || undefined,
+          serviceDueDate: data.service_due_date || undefined,
           status: data.status,
           description: data.description || '',
           notes: data.notes || '',
+          partsUsed: data.parts_used || [],
+          labourEntries: data.labour_entries || [],
           labourCost: parseFloat(data.labour_cost || '0'),
           partsCost: parseFloat(data.parts_cost || '0'),
           totalCost: parseFloat(data.total_cost || '0'),
@@ -190,9 +212,11 @@ export const jobCardStorage = {
       }
 
       const jobNumber = generateJobNumber();
-      const labourCost = jobCard.labourCost || 0;
-      const partsCost = jobCard.partsCost || 0;
-      const totalCost = labourCost + partsCost;
+      
+      // Calculate costs
+      const partsCost = (jobCard.partsUsed || []).reduce((sum, part) => sum + (part.quantity * part.pricePerUnit), 0);
+      const labourCost = (jobCard.labourEntries || []).reduce((sum, labour) => sum + (labour.hours * labour.ratePerHour), 0);
+      const totalCost = partsCost + labourCost;
 
       const { error } = await supabase.from('job_cards').insert({
         job_number: jobNumber,
@@ -205,9 +229,16 @@ export const jobCardStorage = {
         vehicle_make: vehicle.make,
         vehicle_model: vehicle.model,
         vehicle_year: vehicle.year,
+        technician_id: jobCard.technicianId || null,
+        vin_number: jobCard.vinNumber || null,
+        odometer: jobCard.odometer || null,
+        wof_expiry: jobCard.wofExpiry || null,
+        service_due_date: jobCard.serviceDueDate || null,
         status: jobCard.status || 'open',
         description: jobCard.description || '',
         notes: jobCard.notes || '',
+        parts_used: jobCard.partsUsed || [],
+        labour_entries: jobCard.labourEntries || [],
         labour_cost: labourCost,
         parts_cost: partsCost,
         total_cost: totalCost,
@@ -230,14 +261,24 @@ export const jobCardStorage = {
     }
 
     await retryOperation(async () => {
-      const totalCost = updatedJobCard.labourCost + updatedJobCard.partsCost;
+      // Calculate costs
+      const partsCost = (updatedJobCard.partsUsed || []).reduce((sum, part) => sum + (part.quantity * part.pricePerUnit), 0);
+      const labourCost = (updatedJobCard.labourEntries || []).reduce((sum, labour) => sum + (labour.hours * labour.ratePerHour), 0);
+      const totalCost = partsCost + labourCost;
       
       const updateData: any = {
+        technician_id: updatedJobCard.technicianId || null,
+        vin_number: updatedJobCard.vinNumber || null,
+        odometer: updatedJobCard.odometer || null,
+        wof_expiry: updatedJobCard.wofExpiry || null,
+        service_due_date: updatedJobCard.serviceDueDate || null,
         status: updatedJobCard.status,
         description: updatedJobCard.description,
         notes: updatedJobCard.notes,
-        labour_cost: updatedJobCard.labourCost,
-        parts_cost: updatedJobCard.partsCost,
+        parts_used: updatedJobCard.partsUsed || [],
+        labour_entries: updatedJobCard.labourEntries || [],
+        labour_cost: labourCost,
+        parts_cost: partsCost,
         total_cost: totalCost,
         updated_at: new Date().toISOString(),
       };
@@ -290,7 +331,10 @@ export const jobCardStorage = {
       return await retryOperation(async () => {
         const { data, error } = await supabase
           .from('job_cards')
-          .select('*')
+          .select(`
+            *,
+            technician:user_profiles!job_cards_technician_id_fkey(full_name)
+          `)
           .eq('customer_id', customerId)
           .order('created_at', { ascending: false });
 
@@ -311,9 +355,17 @@ export const jobCardStorage = {
           vehicleMake: item.vehicle_make || '',
           vehicleModel: item.vehicle_model || '',
           vehicleYear: item.vehicle_year || '',
+          technicianId: item.technician_id || undefined,
+          technicianName: item.technician?.full_name || undefined,
+          vinNumber: item.vin_number || undefined,
+          odometer: item.odometer || undefined,
+          wofExpiry: item.wof_expiry || undefined,
+          serviceDueDate: item.service_due_date || undefined,
           status: item.status,
           description: item.description || '',
           notes: item.notes || '',
+          partsUsed: item.parts_used || [],
+          labourEntries: item.labour_entries || [],
           labourCost: parseFloat(item.labour_cost || '0'),
           partsCost: parseFloat(item.parts_cost || '0'),
           totalCost: parseFloat(item.total_cost || '0'),
@@ -325,6 +377,190 @@ export const jobCardStorage = {
       }, 'getJobCardsByCustomer');
     } catch (error: any) {
       console.error('Error getting job cards by customer:', error);
+      return [];
+    }
+  },
+
+  // Parts management
+  async getParts(): Promise<Part[]> {
+    try {
+      if (!this.isConfigured()) {
+        console.log('Supabase not configured');
+        return [];
+      }
+
+      return await retryOperation(async () => {
+        const { data, error } = await supabase
+          .from('parts')
+          .select('*')
+          .order('name', { ascending: true });
+
+        if (error) {
+          console.error('Error getting parts from Supabase:', error);
+          throw error;
+        }
+
+        return (data || []).map((item: any) => ({
+          id: item.id,
+          name: item.name,
+          description: item.description || undefined,
+          stockQuantity: item.stock_quantity,
+          costPrice: parseFloat(item.cost_price),
+          sellPrice: parseFloat(item.sell_price),
+          supplier: item.supplier || undefined,
+          sku: item.sku || undefined,
+          createdAt: item.created_at,
+          updatedAt: item.updated_at,
+        }));
+      }, 'getParts');
+    } catch (error: any) {
+      console.error('Error getting parts:', error);
+      return [];
+    }
+  },
+
+  async searchParts(query: string): Promise<Part[]> {
+    try {
+      if (!this.isConfigured()) {
+        console.log('Supabase not configured');
+        return [];
+      }
+
+      return await retryOperation(async () => {
+        const { data, error } = await supabase
+          .from('parts')
+          .select('*')
+          .or(`name.ilike.%${query}%,sku.ilike.%${query}%,description.ilike.%${query}%`)
+          .order('name', { ascending: true });
+
+        if (error) {
+          console.error('Error searching parts from Supabase:', error);
+          throw error;
+        }
+
+        return (data || []).map((item: any) => ({
+          id: item.id,
+          name: item.name,
+          description: item.description || undefined,
+          stockQuantity: item.stock_quantity,
+          costPrice: parseFloat(item.cost_price),
+          sellPrice: parseFloat(item.sell_price),
+          supplier: item.supplier || undefined,
+          sku: item.sku || undefined,
+          createdAt: item.created_at,
+          updatedAt: item.updated_at,
+        }));
+      }, 'searchParts');
+    } catch (error: any) {
+      console.error('Error searching parts:', error);
+      return [];
+    }
+  },
+
+  async addPart(part: Partial<Part>): Promise<void> {
+    if (!this.isConfigured()) {
+      throw new Error('Database not configured. Please contact your administrator.');
+    }
+
+    await retryOperation(async () => {
+      const { error } = await supabase.from('parts').insert({
+        name: part.name,
+        description: part.description || null,
+        stock_quantity: part.stockQuantity || 0,
+        cost_price: part.costPrice || 0,
+        sell_price: part.sellPrice || 0,
+        supplier: part.supplier || null,
+        sku: part.sku || null,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      });
+
+      if (error) {
+        console.error('Error adding part to Supabase:', error);
+        throw error;
+      }
+      
+      console.log('Part added successfully to Supabase');
+    }, 'addPart');
+  },
+
+  async updatePart(updatedPart: Part): Promise<void> {
+    if (!this.isConfigured()) {
+      throw new Error('Database not configured. Please contact your administrator.');
+    }
+
+    await retryOperation(async () => {
+      const { error } = await supabase
+        .from('parts')
+        .update({
+          name: updatedPart.name,
+          description: updatedPart.description || null,
+          stock_quantity: updatedPart.stockQuantity,
+          cost_price: updatedPart.costPrice,
+          sell_price: updatedPart.sellPrice,
+          supplier: updatedPart.supplier || null,
+          sku: updatedPart.sku || null,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', updatedPart.id);
+
+      if (error) {
+        console.error('Error updating part in Supabase:', error);
+        throw error;
+      }
+      
+      console.log('Part updated successfully in Supabase');
+    }, 'updatePart');
+  },
+
+  async deletePart(partId: string): Promise<void> {
+    if (!this.isConfigured()) {
+      throw new Error('Database not configured. Please contact your administrator.');
+    }
+
+    await retryOperation(async () => {
+      const { error } = await supabase
+        .from('parts')
+        .delete()
+        .eq('id', partId);
+
+      if (error) {
+        console.error('Error deleting part from Supabase:', error);
+        throw error;
+      }
+      
+      console.log('Part deleted successfully from Supabase');
+    }, 'deletePart');
+  },
+
+  // Get technicians for selection
+  async getTechnicians(): Promise<Array<{ id: string; name: string; email: string }>> {
+    try {
+      if (!this.isConfigured()) {
+        console.log('Supabase not configured');
+        return [];
+      }
+
+      return await retryOperation(async () => {
+        const { data, error } = await supabase
+          .from('user_profiles')
+          .select('id, email, full_name')
+          .in('role', ['admin', 'user', 'technician'])
+          .order('full_name', { ascending: true });
+
+        if (error) {
+          console.error('Error getting technicians from Supabase:', error);
+          throw error;
+        }
+
+        return (data || []).map((item: any) => ({
+          id: item.id,
+          name: item.full_name || item.email,
+          email: item.email,
+        }));
+      }, 'getTechnicians');
+    } catch (error: any) {
+      console.error('Error getting technicians:', error);
       return [];
     }
   },
