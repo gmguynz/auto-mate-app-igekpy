@@ -347,6 +347,24 @@ export default function CustomerDetailScreen() {
         )}
       </View>
 
+      {!isEditing && (
+        <View style={styles.actionBar}>
+          <TouchableOpacity
+            style={styles.viewJobsActionButton}
+            onPress={() => router.push(`/customers/customer-jobs?customerId=${customer.id}&customerName=${encodeURIComponent(getCustomerDisplayName(customer))}`)}
+            activeOpacity={0.7}
+          >
+            <IconSymbol
+              ios_icon_name="doc.text"
+              android_material_icon_name="description"
+              size={20}
+              color={colors.primary}
+            />
+            <Text style={styles.viewJobsActionButtonText}>View All Jobs</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
       {!isEditing && customer.vehicles.length > 0 && (
         <View style={styles.searchContainer}>
           <IconSymbol
@@ -675,6 +693,22 @@ export default function CustomerDetailScreen() {
                     )}
                   </View>
                 )}
+
+                {!isEditing && (
+                  <TouchableOpacity
+                    style={styles.vehicleViewJobsButton}
+                    onPress={() => router.push(`/customers/vehicle-jobs?vehicleId=${vehicle.id}&vehicleReg=${vehicle.registrationNumber}`)}
+                    activeOpacity={0.7}
+                  >
+                    <IconSymbol
+                      ios_icon_name="doc.text"
+                      android_material_icon_name="description"
+                      size={16}
+                      color={colors.primary}
+                    />
+                    <Text style={styles.vehicleViewJobsButtonText}>View Jobs for this Vehicle</Text>
+                  </TouchableOpacity>
+                )}
               </View>
             </React.Fragment>
           ))}
@@ -855,6 +889,30 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: 'bold',
     color: colors.text,
+  },
+  actionBar: {
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    backgroundColor: colors.card,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  viewJobsActionButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    backgroundColor: colors.highlight,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: colors.primary,
+  },
+  viewJobsActionButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: colors.primary,
   },
   searchContainer: {
     flexDirection: 'row',
@@ -1040,6 +1098,24 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: 'bold',
     color: colors.text,
+  },
+  vehicleViewJobsButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    marginTop: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    backgroundColor: colors.highlight,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: colors.primary,
+  },
+  vehicleViewJobsButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.primary,
   },
   buttonContainer: {
     marginTop: 16,

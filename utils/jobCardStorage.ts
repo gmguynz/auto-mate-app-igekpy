@@ -386,6 +386,67 @@ export const jobCardStorage = {
     }
   },
 
+  async getJobCardsByVehicle(vehicleId: string): Promise<JobCard[]> {
+    try {
+      if (!this.isConfigured()) {
+        console.log('Supabase not configured');
+        return [];
+      }
+
+      return await retryOperation(async () => {
+        const { data, error } = await supabase
+          .from('job_cards')
+          .select(`
+            *,
+            technician:user_profiles!job_cards_technician_id_fkey(full_name)
+          `)
+          .eq('vehicle_id', vehicleId)
+          .order('created_at', { ascending: false });
+
+        if (error) {
+          console.error('Error getting job cards by vehicle from Supabase:', error);
+          throw error;
+        }
+
+        return (data || []).map((item: any) => ({
+          id: item.id,
+          jobNumber: item.job_number,
+          customerId: item.customer_id,
+          customerName: item.customer_name || '',
+          customerEmail: item.customer_email || '',
+          customerPhone: item.customer_phone || '',
+          vehicleId: item.vehicle_id,
+          vehicleReg: item.vehicle_reg || '',
+          vehicleMake: item.vehicle_make || '',
+          vehicleModel: item.vehicle_model || '',
+          vehicleYear: item.vehicle_year || '',
+          technicianId: item.technician_id || undefined,
+          technicianName: item.technician?.full_name || undefined,
+          vinNumber: item.vin_number || undefined,
+          odometer: item.odometer || undefined,
+          wofExpiry: item.wof_expiry || undefined,
+          serviceDueDate: item.service_due_date || undefined,
+          status: item.status,
+          description: item.description || undefined,
+          workDone: item.work_done || undefined,
+          notes: item.notes || '',
+          partsUsed: item.parts_used || [],
+          labourEntries: item.labour_entries || [],
+          labourCost: parseFloat(item.labour_cost || '0'),
+          partsCost: parseFloat(item.parts_cost || '0'),
+          totalCost: parseFloat(item.total_cost || '0'),
+          createdAt: item.created_at,
+          updatedAt: item.updated_at,
+          completedAt: item.completed_at,
+          createdBy: item.created_by,
+        }));
+      }, 'getJobCardsByVehicle');
+    } catch (error: any) {
+      console.error('Error getting job cards by vehicle:', error);
+      return [];
+    }
+  },
+
   // Parts management
   async getParts(): Promise<Part[]> {
     try {

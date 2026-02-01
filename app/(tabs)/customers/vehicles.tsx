@@ -160,74 +160,103 @@ export default function VehiclesScreen() {
             const status = getVehicleStatus(vehicle);
             return (
               <React.Fragment key={index}>
-                <TouchableOpacity
-                  style={styles.vehicleCard}
-                  onPress={() => router.push(`/customers/${vehicle.customerId}`)}
-                  activeOpacity={0.7}
-                >
-                  <View style={styles.vehicleHeader}>
-                    <View style={styles.vehicleIcon}>
-                      <IconSymbol
-                        ios_icon_name="car.fill"
-                        android_material_icon_name="directions-car"
-                        size={24}
-                        color={colors.primary}
-                      />
-                    </View>
-                    <View style={styles.vehicleInfo}>
-                      <Text style={styles.vehicleReg}>{vehicle.registrationNumber}</Text>
-                      <Text style={styles.vehicleDetails}>
-                        {vehicle.year} {vehicle.make} {vehicle.model}
-                      </Text>
-                      <Text style={styles.vehicleOwner}>
+                <View style={styles.vehicleCard}>
+                  <TouchableOpacity
+                    style={styles.vehicleMainContent}
+                    onPress={() => router.push(`/customers/${vehicle.customerId}`)}
+                    activeOpacity={0.7}
+                  >
+                    <View style={styles.vehicleHeader}>
+                      <View style={styles.vehicleIcon}>
                         <IconSymbol
-                          ios_icon_name="person.fill"
-                          android_material_icon_name="person"
-                          size={12}
-                          color={colors.textSecondary}
-                        />{' '}
-                        {vehicle.customerName}
-                      </Text>
+                          ios_icon_name="car.fill"
+                          android_material_icon_name="directions-car"
+                          size={24}
+                          color={colors.primary}
+                        />
+                      </View>
+                      <View style={styles.vehicleInfo}>
+                        <Text style={styles.vehicleReg}>{vehicle.registrationNumber}</Text>
+                        <Text style={styles.vehicleDetails}>
+                          {vehicle.year} {vehicle.make} {vehicle.model}
+                        </Text>
+                        <Text style={styles.vehicleOwner}>
+                          <IconSymbol
+                            ios_icon_name="person.fill"
+                            android_material_icon_name="person"
+                            size={12}
+                            color={colors.textSecondary}
+                          />{' '}
+                          {vehicle.customerName}
+                        </Text>
+                      </View>
+                      <View style={[styles.statusBadge, { backgroundColor: status.color + '20' }]}>
+                        <Text style={[styles.statusText, { color: status.color }]}>
+                          {status.status}
+                        </Text>
+                      </View>
                     </View>
-                    <View style={[styles.statusBadge, { backgroundColor: status.color + '20' }]}>
-                      <Text style={[styles.statusText, { color: status.color }]}>
-                        {status.status}
-                      </Text>
-                    </View>
-                  </View>
 
-                  <View style={styles.datesSection}>
-                    <View style={styles.dateItem}>
-                      <Text style={styles.dateLabel}>Inspection Due:</Text>
-                      <Text
-                        style={[
-                          styles.dateValue,
-                          dateUtils.isOverdue(vehicle.inspectionDueDate) && styles.dateOverdue,
-                          dateUtils.isDueSoon(vehicle.inspectionDueDate) && styles.dateDueSoon,
-                        ]}
-                      >
-                        {dateUtils.formatDate(vehicle.inspectionDueDate)}
-                      </Text>
+                    <View style={styles.datesSection}>
+                      <View style={styles.dateItem}>
+                        <Text style={styles.dateLabel}>Inspection Due:</Text>
+                        <Text
+                          style={[
+                            styles.dateValue,
+                            dateUtils.isOverdue(vehicle.inspectionDueDate) && styles.dateOverdue,
+                            dateUtils.isDueSoon(vehicle.inspectionDueDate) && styles.dateDueSoon,
+                          ]}
+                        >
+                          {dateUtils.formatDate(vehicle.inspectionDueDate)}
+                        </Text>
+                      </View>
+                      <View style={styles.dateItem}>
+                        <Text style={styles.dateLabel}>Service Due:</Text>
+                        <Text
+                          style={[
+                            styles.dateValue,
+                            dateUtils.isOverdue(vehicle.serviceDueDate) && styles.dateOverdue,
+                            dateUtils.isDueSoon(vehicle.serviceDueDate) && styles.dateDueSoon,
+                          ]}
+                        >
+                          {dateUtils.formatDate(vehicle.serviceDueDate)}
+                        </Text>
+                      </View>
                     </View>
-                    <View style={styles.dateItem}>
-                      <Text style={styles.dateLabel}>Service Due:</Text>
-                      <Text
-                        style={[
-                          styles.dateValue,
-                          dateUtils.isOverdue(vehicle.serviceDueDate) && styles.dateOverdue,
-                          dateUtils.isDueSoon(vehicle.serviceDueDate) && styles.dateDueSoon,
-                        ]}
-                      >
-                        {dateUtils.formatDate(vehicle.serviceDueDate)}
-                      </Text>
-                    </View>
-                  </View>
-                </TouchableOpacity>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={styles.viewJobsButton}
+                    onPress={() => router.push(`/customers/vehicle-jobs?vehicleId=${vehicle.id}&vehicleReg=${vehicle.registrationNumber}`)}
+                    activeOpacity={0.7}
+                  >
+                    <IconSymbol
+                      ios_icon_name="doc.text"
+                      android_material_icon_name="description"
+                      size={16}
+                      color={colors.primary}
+                    />
+                    <Text style={styles.viewJobsButtonText}>View Jobs</Text>
+                  </TouchableOpacity>
+                </View>
               </React.Fragment>
             );
           })
         )}
       </ScrollView>
+
+      <TouchableOpacity
+        style={styles.fab}
+        onPress={() => router.push('/customers/add')}
+        activeOpacity={0.8}
+      >
+        <IconSymbol
+          ios_icon_name="plus"
+          android_material_icon_name="add"
+          size={28}
+          color={colors.card}
+        />
+      </TouchableOpacity>
     </View>
   );
 }
@@ -313,12 +342,15 @@ const styles = StyleSheet.create({
   vehicleCard: {
     backgroundColor: colors.card,
     borderRadius: 12,
-    padding: 16,
     marginBottom: 12,
     borderWidth: 1,
     borderColor: colors.border,
     boxShadow: '0px 2px 4px rgba(0, 0, 0, 0.05)',
     elevation: 2,
+    overflow: 'hidden',
+  },
+  vehicleMainContent: {
+    padding: 16,
   },
   vehicleHeader: {
     flexDirection: 'row',
@@ -387,5 +419,33 @@ const styles = StyleSheet.create({
   },
   dateDueSoon: {
     color: colors.accent,
+  },
+  viewJobsButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 12,
+    backgroundColor: colors.highlight,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+  },
+  viewJobsButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.primary,
+  },
+  fab: {
+    position: 'absolute',
+    right: 20,
+    bottom: 100,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+    boxShadow: '0px 4px 8px rgba(0, 0, 0, 0.2)',
+    elevation: 6,
   },
 });
