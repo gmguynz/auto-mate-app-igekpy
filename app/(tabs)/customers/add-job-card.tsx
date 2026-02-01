@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
@@ -285,7 +285,7 @@ export default function AddJobCardScreen() {
     setPartsUsed(partsUsed.filter((_, i) => i !== index));
   };
 
-  const calculateTotalCost = () => {
+  const calculateTotalCost = useMemo(() => {
     const partsCost = partsUsed.reduce((sum, part) => sum + (part.quantity * part.pricePerUnit), 0);
     const labourCost = labourEntries.reduce((sum, labour) => sum + (labour.hours * labour.ratePerHour), 0);
     const subtotal = partsCost + labourCost;
@@ -299,7 +299,7 @@ export default function AddJobCardScreen() {
       taxAmount,
       totalWithTax,
     };
-  };
+  }, [partsUsed, labourEntries, defaultTaxRate]);
 
   const getFilteredCustomers = () => {
     if (!customerSearch.trim()) return customers;
@@ -337,7 +337,7 @@ export default function AddJobCardScreen() {
     );
   }
 
-  const costBreakdown = calculateTotalCost();
+  const costBreakdown = calculateTotalCost;
   const selectedTechnician = technicians.find(t => t.id === selectedTechnicianId);
   const customerDisplayName = selectedCustomer 
     ? (selectedCustomer.companyName || `${selectedCustomer.firstName} ${selectedCustomer.lastName}`.trim())
@@ -615,7 +615,7 @@ export default function AddJobCardScreen() {
           )}
 
           {labourEntries.map((labour, index) => (
-            <View key={index} style={styles.itemCard}>
+            <View key={labour.id} style={styles.itemCard}>
               <View style={styles.itemHeader}>
                 <TextInput
                   style={styles.labourDescInput}
