@@ -64,14 +64,51 @@ async function retryOperation<T>(
   throw new Error(`${operationName} failed after ${retries} attempts`);
 }
 
-// Generate unique job number
-function generateJobNumber(): string {
-  const date = new Date();
-  const year = date.getFullYear().toString().slice(-2);
-  const month = (date.getMonth() + 1).toString().padStart(2, '0');
-  const day = date.getDate().toString().padStart(2, '0');
-  const random = Math.floor(Math.random() * 10000).toString().padStart(4, '0');
-  return `JOB${year}${month}${day}-${random}`;
+// Generate unique job number in format CWxxxxx
+async function generateJobNumber(): Promise<string> {
+  try {
+    if (!isSupabaseConfigured()) {
+      // Fallback if Supabase is not configured
+      const randomNum = Math.floor(Math.random() * 100000);
+      return `CW${randomNum.toString().padStart(5, '0')}`;
+    }
+
+    // Get the last job number from the database
+    const { data, error } = await supabase
+      .from('job_cards')
+      .select('job_number')
+      .order('created_at', { ascending: false })
+      .limit(1);
+
+    if (error) {
+      console.error('Error fetching last job number:', error);
+      // Fallback to random number
+      const randomNum = Math.floor(Math.random() * 100000);
+      return `CW${randomNum.toString().padStart(5, '0')}`;
+    }
+
+    let nextNumber = 1;
+    
+    if (data && data.length > 0) {
+      const lastJobNumber = data[0].job_number;
+      // Extract the numeric part from CWxxxxx format
+      const match = lastJobNumber.match(/^CW(\d{5})$/);
+      if (match) {
+        const lastNumber = parseInt(match[1], 10);
+        nextNumber = lastNumber + 1;
+      }
+    }
+
+    // Format as CWxxxxx (5 digits with leading zeros)
+    const jobNumber = `CW${nextNumber.toString().padStart(5, '0')}`;
+    console.log('Generated job number:', jobNumber);
+    return jobNumber;
+  } catch (error) {
+    console.error('Error generating job number:', error);
+    // Fallback to random number
+    const randomNum = Math.floor(Math.random() * 100000);
+    return `CW${randomNum.toString().padStart(5, '0')}`;
+  }
 }
 
 export const jobCardStorage = {
@@ -213,7 +250,7 @@ export const jobCardStorage = {
         throw new Error('Vehicle not found');
       }
 
-      const jobNumber = generateJobNumber();
+      const jobNumber = await generateJobNumber();
       
       // Calculate costs
       const partsCost = (jobCard.partsUsed || []).reduce((sum, part) => sum + (part.quantity * part.pricePerUnit), 0);
