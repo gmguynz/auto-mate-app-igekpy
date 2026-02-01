@@ -190,6 +190,14 @@ export default function PartsScreen() {
     return (
       <View style={styles.container}>
         <View style={styles.header}>
+          <TouchableOpacity onPress={() => router.back()} style={styles.backButton} activeOpacity={0.7}>
+            <IconSymbol
+              ios_icon_name="chevron.left"
+              android_material_icon_name="arrow-back"
+              size={24}
+              color={colors.text}
+            />
+          </TouchableOpacity>
           <Text style={styles.title}>Parts Inventory</Text>
           <View style={{ width: 40 }} />
         </View>
@@ -208,6 +216,14 @@ export default function PartsScreen() {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
+        <TouchableOpacity onPress={() => router.back()} style={styles.backButton} activeOpacity={0.7}>
+          <IconSymbol
+            ios_icon_name="chevron.left"
+            android_material_icon_name="arrow-back"
+            size={24}
+            color={colors.text}
+          />
+        </TouchableOpacity>
         <Text style={styles.title}>Parts Inventory</Text>
         <TouchableOpacity
           onPress={openAddModal}
@@ -511,8 +527,11 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
   },
+  backButton: {
+    padding: 8,
+  },
   title: {
-    fontSize: 28,
+    fontSize: 20,
     fontWeight: 'bold',
     color: colors.text,
   },
