@@ -533,7 +533,7 @@ const styles = StyleSheet.create({
     borderBottomColor: colors.border,
   },
   dashboardTitle: {
-    fontSize: 32,
+    fontSize: 24,
     fontWeight: '800',
     color: colors.text,
     marginBottom: 12,
