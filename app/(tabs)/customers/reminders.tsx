@@ -12,6 +12,7 @@ import {
   ActivityIndicator,
   Platform,
   Pressable,
+  Modal,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { colors } from '@/styles/commonStyles';
@@ -53,6 +54,8 @@ export default function RemindersScreen() {
   });
   const [refreshing, setRefreshing] = useState(false);
   const [sendingEmail, setSendingEmail] = useState<string | null>(null);
+  const [confirmModalVisible, setConfirmModalVisible] = useState(false);
+  const [selectedReminder, setSelectedReminder] = useState<Reminder | null>(null);
 
   useEffect(() => {
     loadReminders();
@@ -222,6 +225,11 @@ Regards,
 Charlie's Workshop`;
 
       console.log('Calling emailService.sendEmail...');
+      console.log('Email data:', {
+        to: reminder.customerEmail,
+        subject,
+        customerName: reminder.customerName,
+      });
       
       const result = await emailService.sendEmail({
         to: reminder.customerEmail,
@@ -234,16 +242,58 @@ Charlie's Workshop`;
       console.log('=== SEND AUTOMATED EMAIL END ===');
 
       if (result.success) {
-        Alert.alert(
-          'Email Sent Successfully',
-          `Reminder email has been sent to ${reminder.customerName} at ${reminder.customerEmail}`,
-          [{ text: 'OK' }]
-        );
+        const successMessage = `Reminder email has been sent to ${reminder.customerName} at ${reminder.customerEmail}`;
+        console.log('SUCCESS:', successMessage);
+        
+        if (Platform.OS === 'web') {
+          // Use window.alert for web as it's more reliable
+          window.alert(`Email Sent Successfully\n\n${successMessage}`);
+        } else {
+          Alert.alert('Email Sent Successfully', successMessage, [{ text: 'OK' }]);
+        }
       } else {
         console.error('Email send failed:', result.error);
+        const errorMessage = result.error || 'Failed to send email. Please check your email configuration.';
+        
+        if (Platform.OS === 'web') {
+          // Use window.confirm for web to show troubleshooting option
+          const showTroubleshooting = window.confirm(
+            `Email Failed\n\n${errorMessage}\n\nWould you like to see troubleshooting tips?`
+          );
+          if (showTroubleshooting) {
+            showEmailTroubleshooting();
+          }
+        } else {
+          Alert.alert(
+            'Email Failed',
+            errorMessage,
+            [
+              { text: 'Cancel', style: 'cancel' },
+              {
+                text: 'Troubleshooting',
+                onPress: () => showEmailTroubleshooting(),
+              },
+            ]
+          );
+        }
+      }
+    } catch (error) {
+      console.error('Error sending email:', error);
+      console.log('=== SEND AUTOMATED EMAIL END (ERROR) ===');
+      
+      const errorMessage = 'An unexpected error occurred while sending the email. Please try again.';
+      
+      if (Platform.OS === 'web') {
+        const showTroubleshooting = window.confirm(
+          `Error\n\n${errorMessage}\n\nWould you like to see troubleshooting tips?`
+        );
+        if (showTroubleshooting) {
+          showEmailTroubleshooting();
+        }
+      } else {
         Alert.alert(
-          'Email Failed',
-          result.error || 'Failed to send email. Please check your email configuration.',
+          'Error',
+          errorMessage,
           [
             { text: 'Cancel', style: 'cancel' },
             {
@@ -253,28 +303,13 @@ Charlie's Workshop`;
           ]
         );
       }
-    } catch (error) {
-      console.error('Error sending email:', error);
-      console.log('=== SEND AUTOMATED EMAIL END (ERROR) ===');
-      Alert.alert(
-        'Error',
-        'An unexpected error occurred while sending the email. Please try again.',
-        [
-          { text: 'Cancel', style: 'cancel' },
-          {
-            text: 'Troubleshooting',
-            onPress: () => showEmailTroubleshooting(),
-          },
-        ]
-      );
     } finally {
       setSendingEmail(null);
     }
   };
 
   const showEmailTroubleshooting = () => {
-    Alert.alert(
-      'Email Troubleshooting',
+    const troubleshootingMessage = 
       'If emails are not arriving, check:\n\n' +
       '1. RESEND_API_KEY is set in Supabase secrets\n' +
       '2. FROM_EMAIL is set to your verified domain\n' +
@@ -283,18 +318,32 @@ Charlie's Workshop`;
       '5. Check Edge Function logs in Supabase\n' +
       '6. Check spam folder\n' +
       '7. Ensure you are logged in\n\n' +
-      'See SUPABASE_SETUP.md for detailed instructions.',
-      [
-        { text: 'OK' },
-        {
-          text: 'View Logs',
-          onPress: () => {
-            const url = 'https://supabase.com/dashboard/project/sykerdryyaorziqjglwb/functions/send-reminder-email/logs';
-            Linking.openURL(url);
+      'See SUPABASE_SETUP.md for detailed instructions.';
+    
+    if (Platform.OS === 'web') {
+      const viewLogs = window.confirm(
+        `Email Troubleshooting\n\n${troubleshootingMessage}\n\nWould you like to view the Edge Function logs?`
+      );
+      if (viewLogs) {
+        const url = 'https://supabase.com/dashboard/project/sykerdryyaorziqjglwb/functions/send-reminder-email/logs';
+        window.open(url, '_blank');
+      }
+    } else {
+      Alert.alert(
+        'Email Troubleshooting',
+        troubleshootingMessage,
+        [
+          { text: 'OK' },
+          {
+            text: 'View Logs',
+            onPress: () => {
+              const url = 'https://supabase.com/dashboard/project/sykerdryyaorziqjglwb/functions/send-reminder-email/logs';
+              Linking.openURL(url);
+            },
           },
-        },
-      ]
-    );
+        ]
+      );
+    }
   };
 
   const handleSendReminder = (reminder: Reminder) => {
@@ -310,58 +359,70 @@ Charlie's Workshop`;
 
     if (!hasEmail) {
       console.log('No email address');
-      Alert.alert('Error', 'No email address available for this customer');
+      if (Platform.OS === 'web') {
+        window.alert('Error\n\nNo email address available for this customer');
+      } else {
+        Alert.alert('Error', 'No email address available for this customer');
+      }
       return;
     }
 
     if (!supabaseConfigured) {
       console.log('Supabase not configured');
-      Alert.alert(
-        'Email Service Not Configured',
-        'Automated email reminders require Supabase configuration. Please set up the email service to send reminders.',
-        [
-          { text: 'Cancel', style: 'cancel' },
-          {
-            text: 'Setup Instructions',
-            onPress: () => emailService.showSetupInstructions(),
-          },
-        ]
-      );
+      if (Platform.OS === 'web') {
+        const setupInstructions = window.confirm(
+          'Email Service Not Configured\n\nAutomated email reminders require Supabase configuration. Please set up the email service to send reminders.\n\nWould you like to see setup instructions?'
+        );
+        if (setupInstructions) {
+          emailService.showSetupInstructions();
+        }
+      } else {
+        Alert.alert(
+          'Email Service Not Configured',
+          'Automated email reminders require Supabase configuration. Please set up the email service to send reminders.',
+          [
+            { text: 'Cancel', style: 'cancel' },
+            {
+              text: 'Setup Instructions',
+              onPress: () => emailService.showSetupInstructions(),
+            },
+          ]
+        );
+      }
       return;
     }
 
-    console.log('Showing confirmation alert');
-    Alert.alert(
-      'Send Email Reminder',
-      `Send automated email reminder to ${reminder.customerName} at ${reminder.customerEmail}?`,
-      [
-        { 
-          text: 'Cancel', 
-          style: 'cancel',
-          onPress: () => console.log('User cancelled email send'),
-        },
-        {
-          text: 'Send Email',
-          onPress: () => {
-            console.log('User confirmed email send');
-            sendAutomatedEmail(reminder);
-          },
-        },
-      ]
-    );
+    console.log('Opening confirmation modal');
+    setSelectedReminder(reminder);
+    setConfirmModalVisible(true);
     console.log('=== HANDLE SEND REMINDER END ===');
+  };
+
+  const handleConfirmSendEmail = () => {
+    console.log('User confirmed email send via modal');
+    setConfirmModalVisible(false);
+    if (selectedReminder) {
+      sendAutomatedEmail(selectedReminder);
+    }
+    setSelectedReminder(null);
+  };
+
+  const handleCancelSendEmail = () => {
+    console.log('User cancelled email send via modal');
+    setConfirmModalVisible(false);
+    setSelectedReminder(null);
   };
 
   const getReminderTypeText = (reminder: Reminder) => {
     if (reminder.isMerged) {
-      return reminder.isOverdue 
-        ? 'WOF & Service OVERDUE' 
-        : `WOF & Service due in ${reminder.daysUntil} days`;
+      const overdueText = 'WOF & Service OVERDUE';
+      const dueText = `WOF & Service due in ${reminder.daysUntil} days`;
+      return reminder.isOverdue ? overdueText : dueText;
     }
     const type = reminder.types[0] === 'inspection' ? 'WOF' : 'Service';
-    return reminder.isOverdue 
-      ? `${type} OVERDUE` 
-      : `${type} due in ${reminder.daysUntil} days`;
+    const overdueText = `${type} OVERDUE`;
+    const dueText = `${type} due in ${reminder.daysUntil} days`;
+    return reminder.isOverdue ? overdueText : dueText;
   };
 
   const overdueReminders = reminders.filter((r) => r.isOverdue);
@@ -451,7 +512,7 @@ Charlie's Workshop`;
               color="#856404"
             />
             <Text style={[styles.infoText, { color: '#856404' }]}>
-              Web Mode: Make sure you are logged in. Check browser console for detailed logs.
+              Web Mode: Ensure you are logged in. Check browser console (F12) for detailed logs if emails fail.
             </Text>
           </View>
         )}
@@ -592,6 +653,64 @@ Charlie's Workshop`;
 
         <AppFooter />
       </ScrollView>
+
+      {/* Confirmation Modal for Email Sending */}
+      <Modal
+        visible={confirmModalVisible}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={handleCancelSendEmail}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <IconSymbol
+                ios_icon_name="envelope.fill"
+                android_material_icon_name="email"
+                size={32}
+                color={colors.primary}
+              />
+              <Text style={styles.modalTitle}>Send Email Reminder</Text>
+            </View>
+            
+            {selectedReminder && (
+              <View style={styles.modalBody}>
+                <Text style={styles.modalText}>
+                  Send automated email reminder to:
+                </Text>
+                <Text style={styles.modalCustomerName}>
+                  {selectedReminder.customerName}
+                </Text>
+                <Text style={styles.modalEmail}>
+                  {selectedReminder.customerEmail}
+                </Text>
+                <View style={styles.modalDivider} />
+                <Text style={styles.modalVehicleInfo}>
+                  {selectedReminder.vehicleReg} - {selectedReminder.vehicleDetails}
+                </Text>
+                <Text style={styles.modalReminderType}>
+                  {getReminderTypeText(selectedReminder)}
+                </Text>
+              </View>
+            )}
+
+            <View style={styles.modalButtons}>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.modalButtonCancel]}
+                onPress={handleCancelSendEmail}
+              >
+                <Text style={styles.modalButtonTextCancel}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.modalButtonConfirm]}
+                onPress={handleConfirmSendEmail}
+              >
+                <Text style={styles.modalButtonTextConfirm}>Send Email</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -785,5 +904,103 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     marginTop: 8,
     textAlign: 'center',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  modalContent: {
+    backgroundColor: colors.card,
+    borderRadius: 16,
+    padding: 24,
+    width: '100%',
+    maxWidth: 400,
+    boxShadow: '0px 4px 20px rgba(0, 0, 0, 0.15)',
+    elevation: 5,
+  },
+  modalHeader: {
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: colors.text,
+    marginTop: 12,
+    textAlign: 'center',
+  },
+  modalBody: {
+    marginBottom: 24,
+  },
+  modalText: {
+    fontSize: 15,
+    color: colors.textSecondary,
+    marginBottom: 12,
+    textAlign: 'center',
+  },
+  modalCustomerName: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: colors.text,
+    textAlign: 'center',
+    marginBottom: 4,
+  },
+  modalEmail: {
+    fontSize: 15,
+    color: colors.primary,
+    textAlign: 'center',
+    marginBottom: 16,
+  },
+  modalDivider: {
+    height: 1,
+    backgroundColor: colors.border,
+    marginVertical: 16,
+  },
+  modalVehicleInfo: {
+    fontSize: 14,
+    color: colors.text,
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  modalReminderType: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.text,
+    textAlign: 'center',
+  },
+  modalButtons: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  modalButton: {
+    flex: 1,
+    paddingVertical: 14,
+    paddingHorizontal: 20,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    ...(Platform.OS === 'web' && {
+      cursor: 'pointer',
+      userSelect: 'none',
+    }),
+  },
+  modalButtonCancel: {
+    backgroundColor: colors.border,
+  },
+  modalButtonConfirm: {
+    backgroundColor: colors.primary,
+  },
+  modalButtonTextCancel: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: colors.text,
+  },
+  modalButtonTextConfirm: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#FFFFFF',
   },
 });
