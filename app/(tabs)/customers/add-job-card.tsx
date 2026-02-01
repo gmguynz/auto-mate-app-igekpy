@@ -448,7 +448,7 @@ export default function AddJobCardScreen() {
             onChangeText={setOdometer}
             placeholder="Enter odometer reading"
             placeholderTextColor={colors.textSecondary}
-            keyboardType="numeric"
+            keyboardType="decimal-pad"
           />
 
           <Text style={styles.label}>WOF Expiry</Text>
@@ -565,7 +565,7 @@ export default function AddJobCardScreen() {
                       style={styles.itemInput}
                       value={part.quantity.toString()}
                       onChangeText={(text) => updatePartUsed(index, 'quantity', parseFloat(text) || 0)}
-                      keyboardType="numeric"
+                      keyboardType="decimal-pad"
                     />
                   </View>
                   <View style={styles.itemField}>
@@ -574,7 +574,7 @@ export default function AddJobCardScreen() {
                       style={styles.itemInput}
                       value={part.pricePerUnit.toString()}
                       onChangeText={(text) => updatePartUsed(index, 'pricePerUnit', parseFloat(text) || 0)}
-                      keyboardType="numeric"
+                      keyboardType="decimal-pad"
                     />
                   </View>
                   <View style={styles.itemField}>
@@ -648,7 +648,7 @@ export default function AddJobCardScreen() {
                       style={styles.itemInput}
                       value={labour.hours.toString()}
                       onChangeText={(text) => updateLabourEntry(index, 'hours', parseFloat(text) || 0)}
-                      keyboardType="numeric"
+                      keyboardType="decimal-pad"
                     />
                   </View>
                   <View style={styles.itemField}>
@@ -657,7 +657,7 @@ export default function AddJobCardScreen() {
                       style={styles.itemInput}
                       value={labour.ratePerHour.toString()}
                       onChangeText={(text) => updateLabourEntry(index, 'ratePerHour', parseFloat(text) || 0)}
-                      keyboardType="numeric"
+                      keyboardType="decimal-pad"
                     />
                   </View>
                   <View style={styles.itemField}>

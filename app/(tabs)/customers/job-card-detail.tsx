@@ -16,17 +16,21 @@ import { IconSymbol } from '@/components/IconSymbol';
 import { jobCardStorage } from '@/utils/jobCardStorage';
 import { dateUtils } from '@/utils/dateUtils';
 import { JobCard } from '@/types/jobCard';
+import { useAuth } from '@/contexts/AuthContext';
 
 export default function JobCardDetailScreen() {
   const router = useRouter();
   const params = useLocalSearchParams();
   const jobCardId = params.id as string;
+  const { isAdmin } = useAuth();
 
   const [loading, setLoading] = useState(true);
   const [jobCard, setJobCard] = useState<JobCard | null>(null);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [taxRate, setTaxRate] = useState(0);
+  const [showStatusModal, setShowStatusModal] = useState(false);
+  const [changingStatus, setChangingStatus] = useState(false);
 
   useEffect(() => {
     console.log('Job Card Detail screen loaded for ID:', jobCardId);
@@ -83,6 +87,33 @@ export default function JobCardDetailScreen() {
       alert(error.message || 'Failed to delete job card');
     } finally {
       setDeleting(false);
+    }
+  };
+
+  const handleStatusClick = () => {
+    if (isAdmin) {
+      console.log('Admin tapped status badge to change status');
+      setShowStatusModal(true);
+    }
+  };
+
+  const handleStatusChange = async (newStatus: 'open' | 'in_progress' | 'completed' | 'cancelled') => {
+    if (!jobCard) return;
+    
+    console.log('Admin changing status from', jobCard.status, 'to', newStatus);
+    setChangingStatus(true);
+    
+    try {
+      const updatedJobCard = { ...jobCard, status: newStatus };
+      await jobCardStorage.updateJobCard(updatedJobCard);
+      setJobCard(updatedJobCard);
+      setShowStatusModal(false);
+      console.log('Status changed successfully');
+    } catch (error: any) {
+      console.error('Error changing status:', error);
+      alert(error.message || 'Failed to change status');
+    } finally {
+      setChangingStatus(false);
     }
   };
 
@@ -174,9 +205,22 @@ export default function JobCardDetailScreen() {
             <Text style={styles.jobNumberLabel}>Job Number</Text>
             <Text style={styles.jobNumber}>{jobCard.jobNumber}</Text>
           </View>
-          <View style={[styles.statusBadge, { backgroundColor: getStatusColor(jobCard.status) }]}>
+          <TouchableOpacity
+            style={[styles.statusBadge, { backgroundColor: getStatusColor(jobCard.status) }]}
+            onPress={handleStatusClick}
+            activeOpacity={isAdmin ? 0.7 : 1}
+            disabled={!isAdmin}
+          >
             <Text style={styles.statusText}>{getStatusLabel(jobCard.status)}</Text>
-          </View>
+            {isAdmin && (
+              <IconSymbol
+                ios_icon_name="chevron.down"
+                android_material_icon_name="arrow-drop-down"
+                size={16}
+                color="#FFFFFF"
+              />
+            )}
+          </TouchableOpacity>
         </View>
 
         {/* Customer & Vehicle Info */}
@@ -418,6 +462,122 @@ export default function JobCardDetailScreen() {
           </View>
         </View>
       </Modal>
+
+      {/* Status Change Modal (Admin Only) */}
+      <Modal visible={showStatusModal} animationType="slide" transparent>
+        <View style={styles.statusModalOverlay}>
+          <View style={styles.statusModal}>
+            <View style={styles.statusModalHeader}>
+              <Text style={styles.statusModalTitle}>Change Job Status</Text>
+              <TouchableOpacity onPress={() => setShowStatusModal(false)} activeOpacity={0.7}>
+                <IconSymbol
+                  ios_icon_name="xmark.circle.fill"
+                  android_material_icon_name="cancel"
+                  size={28}
+                  color={colors.textSecondary}
+                />
+              </TouchableOpacity>
+            </View>
+            
+            <View style={styles.statusOptions}>
+              <TouchableOpacity
+                style={[
+                  styles.statusOption,
+                  jobCard.status === 'open' && styles.statusOptionSelected,
+                ]}
+                onPress={() => handleStatusChange('open')}
+                activeOpacity={0.7}
+                disabled={changingStatus}
+              >
+                <View style={[styles.statusOptionBadge, { backgroundColor: colors.accent }]}>
+                  <Text style={styles.statusOptionBadgeText}>Open</Text>
+                </View>
+                {jobCard.status === 'open' && (
+                  <IconSymbol
+                    ios_icon_name="checkmark.circle.fill"
+                    android_material_icon_name="check-circle"
+                    size={24}
+                    color={colors.primary}
+                  />
+                )}
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[
+                  styles.statusOption,
+                  jobCard.status === 'in_progress' && styles.statusOptionSelected,
+                ]}
+                onPress={() => handleStatusChange('in_progress')}
+                activeOpacity={0.7}
+                disabled={changingStatus}
+              >
+                <View style={[styles.statusOptionBadge, { backgroundColor: colors.primary }]}>
+                  <Text style={styles.statusOptionBadgeText}>In Progress</Text>
+                </View>
+                {jobCard.status === 'in_progress' && (
+                  <IconSymbol
+                    ios_icon_name="checkmark.circle.fill"
+                    android_material_icon_name="check-circle"
+                    size={24}
+                    color={colors.primary}
+                  />
+                )}
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[
+                  styles.statusOption,
+                  jobCard.status === 'completed' && styles.statusOptionSelected,
+                ]}
+                onPress={() => handleStatusChange('completed')}
+                activeOpacity={0.7}
+                disabled={changingStatus}
+              >
+                <View style={[styles.statusOptionBadge, { backgroundColor: colors.success }]}>
+                  <Text style={styles.statusOptionBadgeText}>Completed</Text>
+                </View>
+                {jobCard.status === 'completed' && (
+                  <IconSymbol
+                    ios_icon_name="checkmark.circle.fill"
+                    android_material_icon_name="check-circle"
+                    size={24}
+                    color={colors.primary}
+                  />
+                )}
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[
+                  styles.statusOption,
+                  jobCard.status === 'cancelled' && styles.statusOptionSelected,
+                ]}
+                onPress={() => handleStatusChange('cancelled')}
+                activeOpacity={0.7}
+                disabled={changingStatus}
+              >
+                <View style={[styles.statusOptionBadge, { backgroundColor: colors.error }]}>
+                  <Text style={styles.statusOptionBadgeText}>Cancelled</Text>
+                </View>
+                {jobCard.status === 'cancelled' && (
+                  <IconSymbol
+                    ios_icon_name="checkmark.circle.fill"
+                    android_material_icon_name="check-circle"
+                    size={24}
+                    color={colors.primary}
+                  />
+                )}
+              </TouchableOpacity>
+            </View>
+
+            {changingStatus && (
+              <View style={styles.statusModalLoading}>
+                <ActivityIndicator size="small" color={colors.primary} />
+                <Text style={styles.statusModalLoadingText}>Updating status...</Text>
+              </View>
+            )}
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -500,6 +660,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
   },
   statusText: {
     fontSize: 14,
@@ -691,5 +854,68 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: '#FFFFFF',
+  },
+  statusModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-end',
+  },
+  statusModal: {
+    backgroundColor: colors.background,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    paddingBottom: 40,
+  },
+  statusModalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  statusModalTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: colors.text,
+  },
+  statusOptions: {
+    padding: 20,
+    gap: 12,
+  },
+  statusOption: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: colors.card,
+    borderWidth: 2,
+    borderColor: colors.border,
+    borderRadius: 12,
+    padding: 16,
+  },
+  statusOptionSelected: {
+    borderColor: colors.primary,
+    backgroundColor: colors.highlight,
+  },
+  statusOptionBadge: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+  },
+  statusOptionBadgeText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#FFFFFF',
+  },
+  statusModalLoading: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 16,
+    gap: 12,
+  },
+  statusModalLoadingText: {
+    fontSize: 14,
+    color: colors.textSecondary,
   },
 });
