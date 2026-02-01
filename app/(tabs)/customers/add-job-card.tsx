@@ -948,7 +948,7 @@ export default function AddJobCardScreen() {
         Platform.OS === 'web' ? (
           <Modal visible={showDatePicker} animationType="slide" transparent>
             <View style={styles.modalOverlay}>
-              <View style={styles.datePickerModal}>
+              <View style={styles.webDatePickerModal}>
                 <View style={styles.datePickerHeader}>
                   <TouchableOpacity onPress={() => { setShowDatePicker(false); setDatePickerField(null); setWebDateInput(''); }} activeOpacity={0.7}>
                     <Text style={styles.datePickerCancel}>Cancel</Text>
@@ -967,6 +967,7 @@ export default function AddJobCardScreen() {
                     onChangeText={setWebDateInput}
                     placeholder="YYYY-MM-DD"
                     placeholderTextColor={colors.textSecondary}
+                    autoFocus
                   />
                   <Text style={styles.webDateHint}>Enter date in format: YYYY-MM-DD (e.g., 2024-12-31)</Text>
                 </View>
@@ -1250,14 +1251,23 @@ const styles = StyleSheet.create({
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'flex-end',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   modalContent: {
     backgroundColor: colors.background,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    maxHeight: '80%',
-    paddingBottom: 40,
+    borderRadius: 20,
+    width: Platform.OS === 'web' ? '90%' : '100%',
+    maxWidth: 600,
+    maxHeight: Platform.OS === 'web' ? '85vh' : '90%',
+    ...(Platform.OS !== 'web' && {
+      position: 'absolute',
+      bottom: 0,
+      left: 0,
+      right: 0,
+      borderBottomLeftRadius: 0,
+      borderBottomRightRadius: 0,
+    }),
   },
   modalHeader: {
     flexDirection: 'row',
@@ -1323,6 +1333,17 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     paddingBottom: 40,
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+  },
+  webDatePickerModal: {
+    backgroundColor: colors.background,
+    borderRadius: 20,
+    width: Platform.OS === 'web' ? '90%' : '100%',
+    maxWidth: 500,
+    padding: 20,
   },
   datePickerHeader: {
     flexDirection: 'row',

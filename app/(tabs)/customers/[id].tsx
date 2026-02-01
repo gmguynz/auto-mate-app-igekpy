@@ -35,6 +35,8 @@ export default function CustomerDetailScreen() {
     vehicleIndex: number;
     field: 'inspection' | 'service';
   }>({ show: false, vehicleIndex: -1, field: 'inspection' });
+  const [tempDate, setTempDate] = useState(new Date());
+  const [webDateInput, setWebDateInput] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [showTransferModal, setShowTransferModal] = useState(false);
   const [transferVehicleIndex, setTransferVehicleIndex] = useState(-1);
@@ -211,8 +213,26 @@ export default function CustomerDetailScreen() {
     }
   };
 
+  const handleIOSDatePickerDone = () => {
+    if (showDatePicker.vehicleIndex >= 0 && editedCustomer) {
+      const dateString = tempDate.toISOString().split('T')[0];
+      const field = showDatePicker.field === 'inspection' ? 'inspectionDueDate' : 'serviceDueDate';
+      updateVehicle(showDatePicker.vehicleIndex, field, dateString);
+    }
+    closeDatePicker();
+  };
+
+  const handleWebDatePickerDone = () => {
+    if (showDatePicker.vehicleIndex >= 0 && editedCustomer && webDateInput) {
+      const field = showDatePicker.field === 'inspection' ? 'inspectionDueDate' : 'serviceDueDate';
+      updateVehicle(showDatePicker.vehicleIndex, field, webDateInput);
+    }
+    closeDatePicker();
+  };
+
   const closeDatePicker = () => {
     setShowDatePicker({ show: false, vehicleIndex: -1, field: 'inspection' });
+    setWebDateInput('');
   };
 
   const getCustomerDisplayName = (cust: Customer) => {
@@ -259,6 +279,44 @@ export default function CustomerDetailScreen() {
     const dateField = showDatePicker.field === 'inspection' ? 'inspectionDueDate' : 'serviceDueDate';
     const currentDate = vehicle[dateField] ? new Date(vehicle[dateField]) : new Date();
 
+    if (Platform.OS === 'web') {
+      return (
+        <Modal
+          transparent={true}
+          animationType="slide"
+          visible={showDatePicker.show}
+          onRequestClose={closeDatePicker}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={styles.webDatePickerModal}>
+              <View style={styles.datePickerHeader}>
+                <TouchableOpacity onPress={closeDatePicker} activeOpacity={0.7}>
+                  <Text style={styles.datePickerCancel}>Cancel</Text>
+                </TouchableOpacity>
+                <Text style={styles.datePickerTitle}>
+                  {showDatePicker.field === 'inspection' ? 'Inspection Due Date' : 'Service Due Date'}
+                </Text>
+                <TouchableOpacity onPress={handleWebDatePickerDone} activeOpacity={0.7}>
+                  <Text style={styles.datePickerDone}>Done</Text>
+                </TouchableOpacity>
+              </View>
+              <View style={styles.webDatePickerContent}>
+                <TextInput
+                  style={styles.webDateInput}
+                  value={webDateInput}
+                  onChangeText={setWebDateInput}
+                  placeholder="YYYY-MM-DD"
+                  placeholderTextColor={colors.textSecondary}
+                  autoFocus
+                />
+                <Text style={styles.webDateHint}>Enter date in format: YYYY-MM-DD (e.g., 2024-12-31)</Text>
+              </View>
+            </View>
+          </View>
+        </Modal>
+      );
+    }
+
     if (Platform.OS === 'ios') {
       return (
         <Modal
@@ -268,17 +326,20 @@ export default function CustomerDetailScreen() {
           onRequestClose={closeDatePicker}
         >
           <View style={styles.modalOverlay}>
-            <View style={styles.modalContent}>
-              <View style={styles.modalHeader}>
+            <View style={styles.iosDatePickerModal}>
+              <View style={styles.datePickerHeader}>
                 <TouchableOpacity onPress={closeDatePicker} activeOpacity={0.7}>
-                  <Text style={styles.modalDoneButton}>Done</Text>
+                  <Text style={styles.datePickerCancel}>Cancel</Text>
+                </TouchableOpacity>
+                <TouchableOpacity onPress={handleIOSDatePickerDone} activeOpacity={0.7}>
+                  <Text style={styles.datePickerDone}>Done</Text>
                 </TouchableOpacity>
               </View>
               <DateTimePicker
-                value={currentDate}
+                value={tempDate}
                 mode="date"
                 display="spinner"
-                onChange={handleDateChange}
+                onChange={(event, date) => date && setTempDate(date)}
                 textColor={colors.text}
                 style={styles.iosDatePicker}
                 minimumDate={new Date()}
@@ -609,13 +670,19 @@ export default function CustomerDetailScreen() {
                 {isEditing ? (
                   <TouchableOpacity
                     style={styles.dateButton}
-                    onPress={() =>
+                    onPress={() => {
+                      const currentDate = vehicle.inspectionDueDate || '';
+                      if (Platform.OS === 'web') {
+                        setWebDateInput(currentDate);
+                      } else {
+                        setTempDate(currentDate ? new Date(currentDate) : new Date());
+                      }
                       setShowDatePicker({
                         show: true,
                         vehicleIndex: index,
                         field: 'inspection',
-                      })
-                    }
+                      });
+                    }}
                     activeOpacity={0.7}
                   >
                     <IconSymbol
@@ -663,13 +730,19 @@ export default function CustomerDetailScreen() {
                 {isEditing ? (
                   <TouchableOpacity
                     style={styles.dateButton}
-                    onPress={() =>
+                    onPress={() => {
+                      const currentDate = vehicle.serviceDueDate || '';
+                      if (Platform.OS === 'web') {
+                        setWebDateInput(currentDate);
+                      } else {
+                        setTempDate(currentDate ? new Date(currentDate) : new Date());
+                      }
                       setShowDatePicker({
                         show: true,
                         vehicleIndex: index,
                         field: 'service',
-                      })
-                    }
+                      });
+                    }}
                     activeOpacity={0.7}
                   >
                     <IconSymbol
@@ -1191,16 +1264,28 @@ const styles = StyleSheet.create({
   },
   modalOverlay: {
     flex: 1,
-    justifyContent: 'flex-end',
+    justifyContent: 'center',
+    alignItems: 'center',
     backgroundColor: colors.overlay,
   },
-  modalContent: {
+  iosDatePickerModal: {
     backgroundColor: colors.card,
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     paddingBottom: 34,
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
   },
-  modalHeader: {
+  webDatePickerModal: {
+    backgroundColor: colors.background,
+    borderRadius: 20,
+    width: Platform.OS === 'web' ? '90%' : '100%',
+    maxWidth: 500,
+    padding: 20,
+  },
+  datePickerHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
@@ -1208,8 +1293,19 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
   },
-  modalDoneButton: {
-    fontSize: 17,
+  datePickerTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: colors.text,
+  },
+  datePickerCancel: {
+    fontSize: 16,
+    color: colors.error,
+    cursor: Platform.OS === 'web' ? 'pointer' : undefined,
+    userSelect: Platform.OS === 'web' ? 'none' : undefined,
+  },
+  datePickerDone: {
+    fontSize: 16,
     fontWeight: '600',
     color: colors.primary,
     cursor: Platform.OS === 'web' ? 'pointer' : undefined,
@@ -1219,18 +1315,38 @@ const styles = StyleSheet.create({
     height: 216,
     backgroundColor: colors.card,
   },
+  webDatePickerContent: {
+    padding: 20,
+  },
+  webDateInput: {
+    backgroundColor: colors.card,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 8,
+    padding: 16,
+    fontSize: 18,
+    color: colors.text,
+    textAlign: 'center',
+    marginBottom: 12,
+  },
+  webDateHint: {
+    fontSize: 14,
+    color: colors.textSecondary,
+    textAlign: 'center',
+  },
   transferModalContent: {
     backgroundColor: colors.background,
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    maxHeight: '90%',
-    minHeight: Platform.OS === 'web' ? 500 : '70%',
-    height: Platform.OS === 'ios' ? '85%' : 'auto',
-    ...(Platform.OS === 'web' && {
-      maxWidth: 600,
-      alignSelf: 'center',
-      width: '100%',
-      marginBottom: 40,
+    borderRadius: 24,
+    width: Platform.OS === 'web' ? '90%' : '100%',
+    maxWidth: 600,
+    maxHeight: Platform.OS === 'web' ? '85vh' : '90%',
+    ...(Platform.OS !== 'web' && {
+      position: 'absolute',
+      bottom: 0,
+      left: 0,
+      right: 0,
+      borderBottomLeftRadius: 0,
+      borderBottomRightRadius: 0,
     }),
   },
   transferModalHeader: {
