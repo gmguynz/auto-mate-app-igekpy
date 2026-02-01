@@ -158,9 +158,13 @@ export default function JobCardDetailScreen() {
     return null;
   }
 
-  const subtotal = jobCard.partsCost + jobCard.labourCost;
+  // Parse numeric values to ensure they're numbers before calculations
+  const partsCostNum = parseFloat(jobCard.partsCost as any) || 0;
+  const labourCostNum = parseFloat(jobCard.labourCost as any) || 0;
+  const subtotal = partsCostNum + labourCostNum;
   const taxAmount = subtotal * (taxRate / 100);
   const totalWithTax = subtotal + taxAmount;
+  
   const createdDate = dateUtils.formatDate(jobCard.createdAt);
   const updatedDate = dateUtils.formatDate(jobCard.updatedAt);
   const completedDate = jobCard.completedAt ? dateUtils.formatDate(jobCard.completedAt) : null;
@@ -333,9 +337,14 @@ export default function JobCardDetailScreen() {
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Parts Used</Text>
             {jobCard.partsUsed.map((part, index) => {
-              const partTotal = formatCurrency(part.quantity * part.pricePerUnit);
-              const partQuantity = `Qty: ${part.quantity}`;
-              const partPrice = `@ ${formatCurrency(part.pricePerUnit)}`;
+              // Parse to numbers BEFORE calculation
+              const partQuantityNum = parseFloat(part.quantity as any) || 0;
+              const partPriceNum = parseFloat(part.pricePerUnit as any) || 0;
+              const partTotalNum = partQuantityNum * partPriceNum;
+              
+              const partTotal = formatCurrency(partTotalNum);
+              const partQuantity = `Qty: ${partQuantityNum}`;
+              const partPrice = `@ ${formatCurrency(partPriceNum)}`;
               
               return (
                 <View key={index} style={styles.itemCard}>
@@ -358,9 +367,14 @@ export default function JobCardDetailScreen() {
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Labour</Text>
             {jobCard.labourEntries.map((labour, index) => {
-              const labourTotal = formatCurrency(labour.hours * labour.ratePerHour);
-              const labourHours = `${labour.hours} hrs`;
-              const labourRate = `@ ${formatCurrency(labour.ratePerHour)}/hr`;
+              // Parse to numbers BEFORE calculation
+              const labourHoursNum = parseFloat(labour.hours as any) || 0;
+              const labourRateNum = parseFloat(labour.ratePerHour as any) || 0;
+              const labourTotalNum = labourHoursNum * labourRateNum;
+              
+              const labourTotal = formatCurrency(labourTotalNum);
+              const labourHours = `${labourHoursNum} hrs`;
+              const labourRate = `@ ${formatCurrency(labourRateNum)}/hr`;
               const labourDesc = labour.description || 'Labour';
               
               return (
@@ -386,12 +400,12 @@ export default function JobCardDetailScreen() {
             
             <View style={styles.costRow}>
               <Text style={styles.costLabel}>Parts:</Text>
-              <Text style={styles.costValue}>{formatCurrency(jobCard.partsCost)}</Text>
+              <Text style={styles.costValue}>{formatCurrency(partsCostNum)}</Text>
             </View>
             
             <View style={styles.costRow}>
               <Text style={styles.costLabel}>Labour:</Text>
-              <Text style={styles.costValue}>{formatCurrency(jobCard.labourCost)}</Text>
+              <Text style={styles.costValue}>{formatCurrency(labourCostNum)}</Text>
             </View>
             
             <View style={styles.costDivider} />
