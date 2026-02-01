@@ -17,6 +17,8 @@ import { jobCardStorage } from '@/utils/jobCardStorage';
 import { dateUtils } from '@/utils/dateUtils';
 import { JobCard } from '@/types/jobCard';
 import { useAuth } from '@/contexts/AuthContext';
+import * as Print from 'expo-print';
+import { shareAsync } from 'expo-sharing';
 
 export default function JobCardDetailScreen() {
   const router = useRouter();
@@ -31,6 +33,7 @@ export default function JobCardDetailScreen() {
   const [taxRate, setTaxRate] = useState(0);
   const [showStatusModal, setShowStatusModal] = useState(false);
   const [changingStatus, setChangingStatus] = useState(false);
+  const [printing, setPrinting] = useState(false);
 
   useEffect(() => {
     console.log('Job Card Detail screen loaded for ID:', jobCardId);
@@ -117,6 +120,507 @@ export default function JobCardDetailScreen() {
     }
   };
 
+  const handlePrint = async () => {
+    if (!jobCard) return;
+    
+    console.log('User tapped Print button for job card:', jobCard.jobNumber);
+    setPrinting(true);
+    
+    try {
+      const html = generateJobCardHTML(jobCard, taxRate);
+      
+      if (Platform.OS === 'web') {
+        // On web, open print dialog
+        await Print.printAsync({ html });
+        console.log('Print dialog opened');
+      } else {
+        // On mobile, save as PDF and share
+        const { uri } = await Print.printToFileAsync({ html });
+        console.log('PDF generated at:', uri);
+        await shareAsync(uri, { UTI: '.pdf', mimeType: 'application/pdf' });
+        console.log('PDF shared successfully');
+      }
+    } catch (error: any) {
+      console.error('Error printing job card:', error);
+      alert(error.message || 'Failed to print job card');
+    } finally {
+      setPrinting(false);
+    }
+  };
+
+  const generateJobCardHTML = (card: JobCard, tax: number): string => {
+    // Parse numeric values
+    const partsCostNum = parseFloat(card.partsCost as any) || 0;
+    const labourCostNum = parseFloat(card.labourCost as any) || 0;
+    const subtotal = partsCostNum + labourCostNum;
+    const taxAmount = subtotal * (tax / 100);
+    const totalWithTax = subtotal + taxAmount;
+
+    // Generate parts rows
+    const partsRows = card.partsUsed && card.partsUsed.length > 0
+      ? card.partsUsed.map(part => {
+          const partQuantityNum = parseFloat(part.quantity as any) || 0;
+          const partPriceNum = parseFloat(part.pricePerUnit as any) || 0;
+          const partTotalNum = partQuantityNum * partPriceNum;
+          
+          return `
+            <tr>
+              <td style="padding: 8px; border-bottom: 1px solid #e0e0e0;">${part.partName}</td>
+              <td style="padding: 8px; border-bottom: 1px solid #e0e0e0; text-align: center;">${partQuantityNum}</td>
+              <td style="padding: 8px; border-bottom: 1px solid #e0e0e0; text-align: right;">$${partPriceNum.toFixed(2)}</td>
+              <td style="padding: 8px; border-bottom: 1px solid #e0e0e0; text-align: right; font-weight: 600;">$${partTotalNum.toFixed(2)}</td>
+            </tr>
+          `;
+        }).join('')
+      : '<tr><td colspan="4" style="padding: 16px; text-align: center; color: #666;">No parts used</td></tr>';
+
+    // Generate labour rows
+    const labourRows = card.labourEntries && card.labourEntries.length > 0
+      ? card.labourEntries.map(labour => {
+          const labourHoursNum = parseFloat(labour.hours as any) || 0;
+          const labourRateNum = parseFloat(labour.ratePerHour as any) || 0;
+          const labourTotalNum = labourHoursNum * labourRateNum;
+          
+          return `
+            <tr>
+              <td style="padding: 8px; border-bottom: 1px solid #e0e0e0;">${labour.description || 'Labour'}</td>
+              <td style="padding: 8px; border-bottom: 1px solid #e0e0e0; text-align: center;">${labourHoursNum} hrs</td>
+              <td style="padding: 8px; border-bottom: 1px solid #e0e0e0; text-align: right;">$${labourRateNum.toFixed(2)}/hr</td>
+              <td style="padding: 8px; border-bottom: 1px solid #e0e0e0; text-align: right; font-weight: 600;">$${labourTotalNum.toFixed(2)}</td>
+            </tr>
+          `;
+        }).join('')
+      : '<tr><td colspan="4" style="padding: 16px; text-align: center; color: #666;">No labour entries</td></tr>';
+
+    const statusColors: { [key: string]: string } = {
+      open: '#FF9500',
+      in_progress: '#007AFF',
+      completed: '#34C759',
+      cancelled: '#FF3B30',
+    };
+
+    const statusLabels: { [key: string]: string } = {
+      open: 'Open',
+      in_progress: 'In Progress',
+      completed: 'Completed',
+      cancelled: 'Cancelled',
+    };
+
+    return `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <meta charset="utf-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <title>Job Card ${card.jobNumber}</title>
+          <style>
+            @page {
+              size: A4;
+              margin: 20mm;
+            }
+            
+            * {
+              margin: 0;
+              padding: 0;
+              box-sizing: border-box;
+            }
+            
+            body {
+              font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+              font-size: 11pt;
+              line-height: 1.5;
+              color: #333;
+              background: white;
+            }
+            
+            .container {
+              max-width: 210mm;
+              margin: 0 auto;
+              padding: 10mm;
+            }
+            
+            .header {
+              display: flex;
+              justify-content: space-between;
+              align-items: flex-start;
+              margin-bottom: 20px;
+              padding-bottom: 15px;
+              border-bottom: 3px solid #007AFF;
+            }
+            
+            .company-info h1 {
+              font-size: 24pt;
+              color: #007AFF;
+              margin-bottom: 5px;
+            }
+            
+            .company-info p {
+              font-size: 10pt;
+              color: #666;
+            }
+            
+            .job-info {
+              text-align: right;
+            }
+            
+            .job-number {
+              font-size: 20pt;
+              font-weight: bold;
+              color: #333;
+              margin-bottom: 5px;
+            }
+            
+            .status-badge {
+              display: inline-block;
+              padding: 6px 16px;
+              border-radius: 20px;
+              color: white;
+              font-size: 10pt;
+              font-weight: 600;
+              background-color: ${statusColors[card.status] || '#666'};
+            }
+            
+            .section {
+              margin-bottom: 20px;
+            }
+            
+            .section-title {
+              font-size: 14pt;
+              font-weight: bold;
+              color: #007AFF;
+              margin-bottom: 10px;
+              padding-bottom: 5px;
+              border-bottom: 2px solid #e0e0e0;
+            }
+            
+            .info-grid {
+              display: grid;
+              grid-template-columns: 1fr 1fr;
+              gap: 10px;
+              margin-bottom: 15px;
+            }
+            
+            .info-item {
+              display: flex;
+              flex-direction: column;
+            }
+            
+            .info-label {
+              font-size: 9pt;
+              color: #666;
+              text-transform: uppercase;
+              letter-spacing: 0.5px;
+              margin-bottom: 3px;
+            }
+            
+            .info-value {
+              font-size: 11pt;
+              color: #333;
+              font-weight: 600;
+            }
+            
+            .description-box {
+              background: #f8f8f8;
+              padding: 12px;
+              border-radius: 6px;
+              margin-bottom: 10px;
+            }
+            
+            .description-label {
+              font-size: 10pt;
+              font-weight: 600;
+              color: #333;
+              margin-bottom: 5px;
+            }
+            
+            .description-text {
+              font-size: 10pt;
+              color: #666;
+              line-height: 1.6;
+            }
+            
+            table {
+              width: 100%;
+              border-collapse: collapse;
+              margin-bottom: 15px;
+            }
+            
+            th {
+              background: #007AFF;
+              color: white;
+              padding: 10px 8px;
+              text-align: left;
+              font-size: 10pt;
+              font-weight: 600;
+            }
+            
+            th:nth-child(2),
+            th:nth-child(3),
+            th:nth-child(4) {
+              text-align: right;
+            }
+            
+            td {
+              font-size: 10pt;
+              color: #333;
+            }
+            
+            .cost-summary {
+              margin-top: 20px;
+              padding: 15px;
+              background: #f8f8f8;
+              border-radius: 8px;
+            }
+            
+            .cost-row {
+              display: flex;
+              justify-content: space-between;
+              padding: 8px 0;
+              font-size: 11pt;
+            }
+            
+            .cost-row.subtotal {
+              border-top: 1px solid #ccc;
+              margin-top: 8px;
+              padding-top: 12px;
+            }
+            
+            .cost-row.total {
+              border-top: 2px solid #007AFF;
+              margin-top: 8px;
+              padding-top: 12px;
+              font-size: 14pt;
+              font-weight: bold;
+              color: #007AFF;
+            }
+            
+            .footer {
+              margin-top: 30px;
+              padding-top: 15px;
+              border-top: 2px solid #e0e0e0;
+              text-align: center;
+              font-size: 9pt;
+              color: #666;
+            }
+            
+            @media print {
+              body {
+                print-color-adjust: exact;
+                -webkit-print-color-adjust: exact;
+              }
+            }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <!-- Header -->
+            <div class="header">
+              <div class="company-info">
+                <h1>Charlie&apos;s Workshop</h1>
+                <p>Professional Automotive Services</p>
+              </div>
+              <div class="job-info">
+                <div class="job-number">${card.jobNumber}</div>
+                <span class="status-badge">${statusLabels[card.status] || card.status}</span>
+              </div>
+            </div>
+            
+            <!-- Customer & Vehicle Information -->
+            <div class="section">
+              <h2 class="section-title">Customer & Vehicle Information</h2>
+              <div class="info-grid">
+                <div class="info-item">
+                  <span class="info-label">Customer Name</span>
+                  <span class="info-value">${card.customerName}</span>
+                </div>
+                <div class="info-item">
+                  <span class="info-label">Email</span>
+                  <span class="info-value">${card.customerEmail}</span>
+                </div>
+                ${card.customerPhone ? `
+                <div class="info-item">
+                  <span class="info-label">Phone</span>
+                  <span class="info-value">${card.customerPhone}</span>
+                </div>
+                ` : ''}
+                <div class="info-item">
+                  <span class="info-label">Vehicle Registration</span>
+                  <span class="info-value">${card.vehicleReg}</span>
+                </div>
+                <div class="info-item">
+                  <span class="info-label">Make & Model</span>
+                  <span class="info-value">${card.vehicleMake} ${card.vehicleModel}</span>
+                </div>
+                ${card.vehicleYear ? `
+                <div class="info-item">
+                  <span class="info-label">Year</span>
+                  <span class="info-value">${card.vehicleYear}</span>
+                </div>
+                ` : ''}
+                ${card.vinNumber ? `
+                <div class="info-item">
+                  <span class="info-label">VIN</span>
+                  <span class="info-value">${card.vinNumber}</span>
+                </div>
+                ` : ''}
+                ${card.odometer ? `
+                <div class="info-item">
+                  <span class="info-label">Odometer</span>
+                  <span class="info-value">${card.odometer} km</span>
+                </div>
+                ` : ''}
+              </div>
+            </div>
+            
+            ${card.technicianName ? `
+            <!-- Technician -->
+            <div class="section">
+              <h2 class="section-title">Technician</h2>
+              <div class="info-item">
+                <span class="info-label">Assigned To</span>
+                <span class="info-value">${card.technicianName}</span>
+              </div>
+            </div>
+            ` : ''}
+            
+            ${card.wofExpiry || card.serviceDueDate ? `
+            <!-- Service Dates -->
+            <div class="section">
+              <h2 class="section-title">Service Dates</h2>
+              <div class="info-grid">
+                ${card.wofExpiry ? `
+                <div class="info-item">
+                  <span class="info-label">WOF Expiry</span>
+                  <span class="info-value">${card.wofExpiry}</span>
+                </div>
+                ` : ''}
+                ${card.serviceDueDate ? `
+                <div class="info-item">
+                  <span class="info-label">Service Due</span>
+                  <span class="info-value">${card.serviceDueDate}</span>
+                </div>
+                ` : ''}
+              </div>
+            </div>
+            ` : ''}
+            
+            ${card.description || card.workDone || card.notes ? `
+            <!-- Work Description -->
+            <div class="section">
+              <h2 class="section-title">Work Description</h2>
+              ${card.description ? `
+              <div class="description-box">
+                <div class="description-label">Work Required:</div>
+                <div class="description-text">${card.description}</div>
+              </div>
+              ` : ''}
+              ${card.workDone ? `
+              <div class="description-box">
+                <div class="description-label">Work Done:</div>
+                <div class="description-text">${card.workDone}</div>
+              </div>
+              ` : ''}
+              ${card.notes ? `
+              <div class="description-box">
+                <div class="description-label">Notes:</div>
+                <div class="description-text">${card.notes}</div>
+              </div>
+              ` : ''}
+            </div>
+            ` : ''}
+            
+            <!-- Parts Used -->
+            <div class="section">
+              <h2 class="section-title">Parts Used</h2>
+              <table>
+                <thead>
+                  <tr>
+                    <th>Part Name</th>
+                    <th style="text-align: center;">Quantity</th>
+                    <th style="text-align: right;">Unit Price</th>
+                    <th style="text-align: right;">Total</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${partsRows}
+                </tbody>
+              </table>
+            </div>
+            
+            <!-- Labour -->
+            <div class="section">
+              <h2 class="section-title">Labour</h2>
+              <table>
+                <thead>
+                  <tr>
+                    <th>Description</th>
+                    <th style="text-align: center;">Hours</th>
+                    <th style="text-align: right;">Rate</th>
+                    <th style="text-align: right;">Total</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${labourRows}
+                </tbody>
+              </table>
+            </div>
+            
+            <!-- Cost Summary -->
+            <div class="cost-summary">
+              <div class="cost-row">
+                <span>Parts:</span>
+                <span>$${partsCostNum.toFixed(2)}</span>
+              </div>
+              <div class="cost-row">
+                <span>Labour:</span>
+                <span>$${labourCostNum.toFixed(2)}</span>
+              </div>
+              <div class="cost-row subtotal">
+                <span>Subtotal:</span>
+                <span>$${subtotal.toFixed(2)}</span>
+              </div>
+              <div class="cost-row">
+                <span>Tax (${tax}%):</span>
+                <span>$${taxAmount.toFixed(2)}</span>
+              </div>
+              <div class="cost-row total">
+                <span>Total:</span>
+                <span>$${totalWithTax.toFixed(2)}</span>
+              </div>
+            </div>
+            
+            <!-- Dates -->
+            <div class="section">
+              <h2 class="section-title">Job Dates</h2>
+              <div class="info-grid">
+                <div class="info-item">
+                  <span class="info-label">Created</span>
+                  <span class="info-value">${dateUtils.formatDate(card.createdAt)}</span>
+                </div>
+                <div class="info-item">
+                  <span class="info-label">Last Updated</span>
+                  <span class="info-value">${dateUtils.formatDate(card.updatedAt)}</span>
+                </div>
+                ${card.completedAt ? `
+                <div class="info-item">
+                  <span class="info-label">Completed</span>
+                  <span class="info-value">${dateUtils.formatDate(card.completedAt)}</span>
+                </div>
+                ` : ''}
+              </div>
+            </div>
+            
+            <!-- Footer -->
+            <div class="footer">
+              <p>Thank you for choosing Charlie&apos;s Workshop</p>
+              <p>This document was generated on ${new Date().toLocaleDateString()}</p>
+            </div>
+          </div>
+        </body>
+      </html>
+    `;
+  };
+
   const getStatusColor = (status: string) => {
     const statusColorMap = {
       open: colors.accent,
@@ -187,6 +691,23 @@ export default function JobCardDetailScreen() {
         </TouchableOpacity>
         <Text style={styles.title}>Job Card Details</Text>
         <View style={styles.headerButtons}>
+          <TouchableOpacity 
+            onPress={handlePrint} 
+            style={styles.headerButton} 
+            activeOpacity={0.7}
+            disabled={printing}
+          >
+            {printing ? (
+              <ActivityIndicator size="small" color={colors.primary} />
+            ) : (
+              <IconSymbol
+                ios_icon_name="printer.fill"
+                android_material_icon_name="print"
+                size={24}
+                color={colors.primary}
+              />
+            )}
+          </TouchableOpacity>
           <TouchableOpacity onPress={handleEdit} style={styles.headerButton} activeOpacity={0.7}>
             <IconSymbol
               ios_icon_name="pencil"
