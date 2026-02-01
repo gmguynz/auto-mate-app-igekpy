@@ -17,13 +17,13 @@ import {
 import { useRouter } from 'expo-router';
 import { colors } from '@/styles/commonStyles';
 import { IconSymbol } from '@/components/IconSymbol';
-import { AppFooter } from '@/components/AppFooter';
-import { Customer } from '@/types/customer';
 import { storageUtils } from '@/utils/storage';
+import { Customer } from '@/types/customer';
 import { dateUtils } from '@/utils/dateUtils';
 import { notificationService } from '@/utils/notificationService';
 import { emailService } from '@/utils/emailService';
 import { isSupabaseConfigured } from '@/integrations/supabase/client';
+import { AppFooter } from '@/components/AppFooter';
 
 interface Reminder {
   customerId: string;
@@ -46,80 +46,64 @@ interface Reminder {
 export default function RemindersScreen() {
   const router = useRouter();
   const [reminders, setReminders] = useState<Reminder[]>([]);
-  const [notificationStats, setNotificationStats] = useState({
-    total: 0,
-    inspections: 0,
-    services: 0,
-    merged: 0,
-  });
+  const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [sendingEmail, setSendingEmail] = useState<string | null>(null);
-  const [confirmModalVisible, setConfirmModalVisible] = useState(false);
+  const [notificationStats, setNotificationStats] = useState({ total: 0, inspections: 0, services: 0 });
   const [selectedReminder, setSelectedReminder] = useState<Reminder | null>(null);
+  const [showEmailModal, setShowEmailModal] = useState(false);
+  const [sendingEmail, setSendingEmail] = useState(false);
 
   useEffect(() => {
+    console.log('Reminders screen loaded');
     loadReminders();
     loadNotificationStats();
   }, []);
 
   const loadNotificationStats = async () => {
-    const stats = await notificationService.getNotificationStats();
-    setNotificationStats(stats);
+    try {
+      const stats = await notificationService.getNotificationStats();
+      setNotificationStats(stats);
+      console.log(`Notification stats: ${stats.total} total (${stats.inspections} inspections, ${stats.services} services)`);
+    } catch (error) {
+      console.error('Error loading notification stats:', error);
+    }
   };
 
-  const onRefresh = async () => {
+  const onRefresh = () => {
+    console.log('Refreshing reminders...');
     setRefreshing(true);
-    await notificationService.scheduleAllReminders();
-    await loadReminders();
-    await loadNotificationStats();
-    setRefreshing(false);
+    loadReminders();
+    loadNotificationStats();
   };
 
   const getCustomerDisplayName = (customer: Customer) => {
     if (customer.companyName) {
       return customer.companyName;
     }
-    return `${customer.firstName} ${customer.lastName}`.trim();
+    const fullName = `${customer.firstName} ${customer.lastName}`.trim();
+    return fullName;
   };
 
   const loadReminders = async () => {
-    const customers = await storageUtils.getCustomers();
-    const allReminders: Reminder[] = [];
+    try {
+      console.log('Loading reminders...');
+      const customers = await storageUtils.getCustomers();
+      const allReminders: Reminder[] = [];
 
-    customers.forEach((customer) => {
-      const displayName = getCustomerDisplayName(customer);
-      customer.vehicles.forEach((vehicle) => {
-        const inspectionDate = vehicle.inspectionDueDate;
-        const serviceDate = vehicle.serviceDueDate;
+      customers.forEach(customer => {
+        customer.vehicles.forEach(vehicle => {
+          const inspectionDue = vehicle.inspectionDueDate;
+          const serviceDue = vehicle.serviceDueDate;
+          const customerName = getCustomerDisplayName(customer);
+          const vehicleDetails = `${vehicle.make} ${vehicle.model} (${vehicle.year})`;
 
-        if (inspectionDate && serviceDate && inspectionDate === serviceDate) {
-          const daysUntil = dateUtils.getDaysUntil(inspectionDate);
-          if (daysUntil <= 30) {
-            allReminders.push({
-              customerId: customer.id,
-              customerName: displayName,
-              customerEmail: customer.email,
-              customerPhone: customer.phone,
-              customerMobile: customer.mobile,
-              vehicleId: vehicle.id,
-              vehicleReg: vehicle.registrationNumber,
-              vehicleMake: vehicle.make,
-              vehicleModel: vehicle.model,
-              vehicleDetails: `${vehicle.year} ${vehicle.make} ${vehicle.model}`,
-              types: ['inspection', 'service'],
-              dueDate: inspectionDate,
-              daysUntil,
-              isOverdue: dateUtils.isOverdue(inspectionDate),
-              isMerged: true,
-            });
-          }
-        } else {
-          if (inspectionDate) {
-            const daysUntil = dateUtils.getDaysUntil(inspectionDate);
+          // Check if both are due on the same date
+          if (inspectionDue && serviceDue && inspectionDue === serviceDue) {
+            const daysUntil = dateUtils.getDaysUntil(inspectionDue);
             if (daysUntil <= 30) {
               allReminders.push({
                 customerId: customer.id,
-                customerName: displayName,
+                customerName,
                 customerEmail: customer.email,
                 customerPhone: customer.phone,
                 customerMobile: customer.mobile,
@@ -127,590 +111,344 @@ export default function RemindersScreen() {
                 vehicleReg: vehicle.registrationNumber,
                 vehicleMake: vehicle.make,
                 vehicleModel: vehicle.model,
-                vehicleDetails: `${vehicle.year} ${vehicle.make} ${vehicle.model}`,
-                types: ['inspection'],
-                dueDate: inspectionDate,
+                vehicleDetails,
+                types: ['inspection', 'service'],
+                dueDate: inspectionDue,
                 daysUntil,
-                isOverdue: dateUtils.isOverdue(inspectionDate),
-                isMerged: false,
+                isOverdue: daysUntil < 0,
+                isMerged: true,
               });
             }
-          }
+          } else {
+            // Add separate reminders
+            if (inspectionDue) {
+              const daysUntil = dateUtils.getDaysUntil(inspectionDue);
+              if (daysUntil <= 30) {
+                allReminders.push({
+                  customerId: customer.id,
+                  customerName,
+                  customerEmail: customer.email,
+                  customerPhone: customer.phone,
+                  customerMobile: customer.mobile,
+                  vehicleId: vehicle.id,
+                  vehicleReg: vehicle.registrationNumber,
+                  vehicleMake: vehicle.make,
+                  vehicleModel: vehicle.model,
+                  vehicleDetails,
+                  types: ['inspection'],
+                  dueDate: inspectionDue,
+                  daysUntil,
+                  isOverdue: daysUntil < 0,
+                  isMerged: false,
+                });
+              }
+            }
 
-          if (serviceDate) {
-            const daysUntil = dateUtils.getDaysUntil(serviceDate);
-            if (daysUntil <= 30) {
-              allReminders.push({
-                customerId: customer.id,
-                customerName: displayName,
-                customerEmail: customer.email,
-                customerPhone: customer.phone,
-                customerMobile: customer.mobile,
-                vehicleId: vehicle.id,
-                vehicleReg: vehicle.registrationNumber,
-                vehicleMake: vehicle.make,
-                vehicleModel: vehicle.model,
-                vehicleDetails: `${vehicle.year} ${vehicle.make} ${vehicle.model}`,
-                types: ['service'],
-                dueDate: serviceDate,
-                daysUntil,
-                isOverdue: dateUtils.isOverdue(serviceDate),
-                isMerged: false,
-              });
+            if (serviceDue) {
+              const daysUntil = dateUtils.getDaysUntil(serviceDue);
+              if (daysUntil <= 30) {
+                allReminders.push({
+                  customerId: customer.id,
+                  customerName,
+                  customerEmail: customer.email,
+                  customerPhone: customer.phone,
+                  customerMobile: customer.mobile,
+                  vehicleId: vehicle.id,
+                  vehicleReg: vehicle.registrationNumber,
+                  vehicleMake: vehicle.make,
+                  vehicleModel: vehicle.model,
+                  vehicleDetails,
+                  types: ['service'],
+                  dueDate: serviceDue,
+                  daysUntil,
+                  isOverdue: daysUntil < 0,
+                  isMerged: false,
+                });
+              }
             }
           }
-        }
+        });
       });
-    });
 
-    allReminders.sort((a, b) => {
-      if (a.isOverdue && !b.isOverdue) return -1;
-      if (!a.isOverdue && b.isOverdue) return 1;
-      return a.daysUntil - b.daysUntil;
-    });
+      // Sort by days until due (overdue first, then soonest)
+      allReminders.sort((a, b) => a.daysUntil - b.daysUntil);
 
-    setReminders(allReminders);
+      console.log(`Loaded ${allReminders.length} reminders`);
+      setReminders(allReminders);
+    } catch (error) {
+      console.error('Error loading reminders:', error);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
   };
 
   const sendAutomatedEmail = async (reminder: Reminder) => {
-    console.log('=== SEND AUTOMATED EMAIL START ===');
-    console.log('Platform:', Platform.OS);
-    console.log('Reminder:', {
-      vehicleReg: reminder.vehicleReg,
-      customerEmail: reminder.customerEmail,
-      customerName: reminder.customerName,
-    });
-
-    if (!reminder.customerEmail) {
-      console.log('No email address available');
-      Alert.alert('Error', 'No email address available for this customer');
-      return;
-    }
-
-    if (!isSupabaseConfigured()) {
-      console.log('Supabase not configured');
-      emailService.showSetupInstructions();
-      return;
-    }
-
-    setSendingEmail(reminder.vehicleId);
-
+    console.log('Sending automated email to:', reminder.customerEmail);
+    setSendingEmail(true);
     try {
-      let dueItems = '';
-      if (reminder.isMerged) {
-        dueItems = 'WOF and Service';
-      } else if (reminder.types[0] === 'inspection') {
-        dueItems = 'WOF';
-      } else {
-        dueItems = 'Service';
-      }
-      
-      const subject = reminder.isMerged
-        ? `WOF & Service Reminder - ${reminder.vehicleReg}`
-        : `${reminder.types[0] === 'inspection' ? 'WOF' : 'Service'} Reminder - ${reminder.vehicleReg}`;
-      
-      const dueDate = new Date(reminder.dueDate);
-      const dayName = dueDate.toLocaleDateString('en-NZ', { weekday: 'long' });
-      const day = dueDate.getDate();
-      const monthName = dueDate.toLocaleDateString('en-NZ', { month: 'long' });
-      const year = dueDate.getFullYear();
-      
-      const body = `Dear ${reminder.customerName},
+      const reminderType = getReminderTypeText(reminder);
+      const subject = `Reminder: ${reminderType} Due for ${reminder.vehicleReg}`;
+      const body = `Dear ${reminder.customerName},\n\nThis is a friendly reminder that your ${reminderType.toLowerCase()} for ${reminder.vehicleReg} (${reminder.vehicleDetails}) is due on ${dateUtils.formatDate(reminder.dueDate)}.\n\nPlease contact us to schedule an appointment.\n\nBest regards,\nCharlie's Workshop`;
 
-This is a friendly reminder that your vehicle ${reminder.vehicleReg} - ${reminder.vehicleMake} ${reminder.vehicleModel} is due for ${dueItems} on ${dayName} ${day} ${monthName} ${year}.
-
-Please call us on 07 866 2218 to book an appointment.
-
-Regards,
-Charlie's Workshop`;
-
-      console.log('Calling emailService.sendEmail...');
-      console.log('Email data:', {
-        to: reminder.customerEmail,
-        subject,
-        customerName: reminder.customerName,
-      });
-      
-      const result = await emailService.sendEmail({
-        to: reminder.customerEmail,
-        subject,
-        body,
-        customerName: reminder.customerName,
-      });
-
-      console.log('Email send result:', result);
-      console.log('=== SEND AUTOMATED EMAIL END ===');
-
-      if (result.success) {
-        const successMessage = `Reminder email has been sent to ${reminder.customerName} at ${reminder.customerEmail}`;
-        console.log('SUCCESS:', successMessage);
-        
-        if (Platform.OS === 'web') {
-          // Use window.alert for web as it's more reliable
-          window.alert(`Email Sent Successfully\n\n${successMessage}`);
-        } else {
-          Alert.alert('Email Sent Successfully', successMessage, [{ text: 'OK' }]);
-        }
-      } else {
-        console.error('Email send failed:', result.error);
-        const errorMessage = result.error || 'Failed to send email. Please check your email configuration.';
-        
-        if (Platform.OS === 'web') {
-          // Use window.confirm for web to show troubleshooting option
-          const showTroubleshooting = window.confirm(
-            `Email Failed\n\n${errorMessage}\n\nWould you like to see troubleshooting tips?`
-          );
-          if (showTroubleshooting) {
-            showEmailTroubleshooting();
-          }
-        } else {
-          Alert.alert(
-            'Email Failed',
-            errorMessage,
-            [
-              { text: 'Cancel', style: 'cancel' },
-              {
-                text: 'Troubleshooting',
-                onPress: () => showEmailTroubleshooting(),
-              },
-            ]
-          );
-        }
-      }
-    } catch (error) {
+      await emailService.sendEmail(reminder.customerEmail, subject, body);
+      console.log('Email sent successfully');
+      setShowEmailModal(false);
+      setSelectedReminder(null);
+      alert('Email sent successfully!');
+    } catch (error: any) {
       console.error('Error sending email:', error);
-      console.log('=== SEND AUTOMATED EMAIL END (ERROR) ===');
-      
-      const errorMessage = 'An unexpected error occurred while sending the email. Please try again.';
-      
-      if (Platform.OS === 'web') {
-        const showTroubleshooting = window.confirm(
-          `Error\n\n${errorMessage}\n\nWould you like to see troubleshooting tips?`
-        );
-        if (showTroubleshooting) {
-          showEmailTroubleshooting();
-        }
-      } else {
-        Alert.alert(
-          'Error',
-          errorMessage,
-          [
-            { text: 'Cancel', style: 'cancel' },
-            {
-              text: 'Troubleshooting',
-              onPress: () => showEmailTroubleshooting(),
-            },
-          ]
-        );
-      }
+      alert(error.message || 'Failed to send email');
     } finally {
-      setSendingEmail(null);
+      setSendingEmail(false);
     }
   };
 
   const showEmailTroubleshooting = () => {
-    const troubleshootingMessage = 
-      'If emails are not arriving, check:\n\n' +
-      '1. RESEND_API_KEY is set in Supabase secrets\n' +
-      '2. FROM_EMAIL is set to your verified domain\n' +
-      '3. Domain is verified in Resend dashboard\n' +
-      '4. DNS records (TXT, MX, DKIM) are configured\n' +
-      '5. Check Edge Function logs in Supabase\n' +
-      '6. Check spam folder\n' +
-      '7. Ensure you are logged in\n\n' +
-      'See SUPABASE_SETUP.md for detailed instructions.';
-    
-    if (Platform.OS === 'web') {
-      const viewLogs = window.confirm(
-        `Email Troubleshooting\n\n${troubleshootingMessage}\n\nWould you like to view the Edge Function logs?`
-      );
-      if (viewLogs) {
-        const url = 'https://supabase.com/dashboard/project/sykerdryyaorziqjglwb/functions/send-reminder-email/logs';
-        window.open(url, '_blank');
-      }
-    } else {
-      Alert.alert(
-        'Email Troubleshooting',
-        troubleshootingMessage,
-        [
-          { text: 'OK' },
-          {
-            text: 'View Logs',
-            onPress: () => {
-              const url = 'https://supabase.com/dashboard/project/sykerdryyaorziqjglwb/functions/send-reminder-email/logs';
-              Linking.openURL(url);
-            },
-          },
-        ]
-      );
-    }
+    const message = `Email functionality requires Supabase configuration.\n\nTo enable email reminders:\n1. Set up Supabase project\n2. Configure email service\n3. Add SMTP settings\n\nFor now, you can:\n- Call customers directly\n- Send SMS reminders\n- Use your email client`;
+    alert(message);
   };
 
   const handleSendReminder = (reminder: Reminder) => {
-    console.log('=== HANDLE SEND REMINDER START ===');
-    console.log('Platform:', Platform.OS);
-    console.log('Vehicle:', reminder.vehicleReg);
-    
-    const hasEmail = reminder.customerEmail;
-    const supabaseConfigured = isSupabaseConfigured();
-
-    console.log('Has email:', hasEmail);
-    console.log('Supabase configured:', supabaseConfigured);
-
-    if (!hasEmail) {
-      console.log('No email address');
-      if (Platform.OS === 'web') {
-        window.alert('Error\n\nNo email address available for this customer');
-      } else {
-        Alert.alert('Error', 'No email address available for this customer');
-      }
-      return;
-    }
-
-    if (!supabaseConfigured) {
-      console.log('Supabase not configured');
-      if (Platform.OS === 'web') {
-        const setupInstructions = window.confirm(
-          'Email Service Not Configured\n\nAutomated email reminders require Supabase configuration. Please set up the email service to send reminders.\n\nWould you like to see setup instructions?'
-        );
-        if (setupInstructions) {
-          emailService.showSetupInstructions();
-        }
-      } else {
-        Alert.alert(
-          'Email Service Not Configured',
-          'Automated email reminders require Supabase configuration. Please set up the email service to send reminders.',
-          [
-            { text: 'Cancel', style: 'cancel' },
-            {
-              text: 'Setup Instructions',
-              onPress: () => emailService.showSetupInstructions(),
-            },
-          ]
-        );
-      }
-      return;
-    }
-
-    console.log('Opening confirmation modal');
+    console.log('User tapped Send Reminder button for:', reminder.customerName);
     setSelectedReminder(reminder);
-    setConfirmModalVisible(true);
-    console.log('=== HANDLE SEND REMINDER END ===');
+    setShowEmailModal(true);
   };
 
   const handleConfirmSendEmail = () => {
-    console.log('User confirmed email send via modal');
-    setConfirmModalVisible(false);
     if (selectedReminder) {
+      if (!isSupabaseConfigured()) {
+        setShowEmailModal(false);
+        showEmailTroubleshooting();
+        return;
+      }
       sendAutomatedEmail(selectedReminder);
     }
-    setSelectedReminder(null);
   };
 
   const handleCancelSendEmail = () => {
-    console.log('User cancelled email send via modal');
-    setConfirmModalVisible(false);
+    console.log('User cancelled email send');
+    setShowEmailModal(false);
     setSelectedReminder(null);
   };
 
   const getReminderTypeText = (reminder: Reminder) => {
     if (reminder.isMerged) {
-      const overdueText = 'WOF & Service OVERDUE';
-      const dueText = `WOF & Service due in ${reminder.daysUntil} days`;
-      return reminder.isOverdue ? overdueText : dueText;
+      return 'Inspection & Service';
     }
-    const type = reminder.types[0] === 'inspection' ? 'WOF' : 'Service';
-    const overdueText = `${type} OVERDUE`;
-    const dueText = `${type} due in ${reminder.daysUntil} days`;
-    return reminder.isOverdue ? overdueText : dueText;
+    const typeText = reminder.types.includes('inspection') ? 'Inspection' : 'Service';
+    return typeText;
   };
 
-  const overdueReminders = reminders.filter((r) => r.isOverdue);
-  const upcomingReminders = reminders.filter((r) => !r.isOverdue);
+  if (loading) {
+    return (
+      <View style={styles.container}>
+        <View style={styles.header}>
+          <TouchableOpacity onPress={() => router.back()} style={styles.backButton} activeOpacity={0.7}>
+            <IconSymbol
+              ios_icon_name="chevron.left"
+              android_material_icon_name="arrow-back"
+              size={24}
+              color={colors.text}
+            />
+          </TouchableOpacity>
+          <Text style={styles.title}>Reminders</Text>
+          <View style={{ width: 40 }} />
+        </View>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={colors.primary} />
+          <Text style={styles.loadingText}>Loading reminders...</Text>
+        </View>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Pressable 
-          onPress={() => {
-            console.log('Back button pressed');
-            router.back();
-          }} 
-          style={({ pressed }) => [
-            styles.backButton,
-            pressed && styles.buttonPressed,
-          ]}
-        >
+        <TouchableOpacity onPress={() => router.back()} style={styles.backButton} activeOpacity={0.7}>
           <IconSymbol
             ios_icon_name="chevron.left"
             android_material_icon_name="arrow-back"
             size={24}
             color={colors.text}
           />
-        </Pressable>
+        </TouchableOpacity>
         <Text style={styles.title}>Reminders</Text>
         <View style={{ width: 40 }} />
+      </View>
+
+      <View style={styles.statsContainer}>
+        <View style={styles.statCard}>
+          <Text style={styles.statValue}>{notificationStats.total}</Text>
+          <Text style={styles.statLabel}>Total Scheduled</Text>
+        </View>
+        <View style={styles.statCard}>
+          <Text style={styles.statValue}>{notificationStats.inspections}</Text>
+          <Text style={styles.statLabel}>Inspections</Text>
+        </View>
+        <View style={styles.statCard}>
+          <Text style={styles.statValue}>{notificationStats.services}</Text>
+          <Text style={styles.statLabel}>Services</Text>
+        </View>
       </View>
 
       <ScrollView
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}
         showsVerticalScrollIndicator={false}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-        }
       >
-        <View style={styles.automationCard}>
-          <View style={styles.automationHeader}>
+        {reminders.length === 0 ? (
+          <View style={styles.emptyContainer}>
             <IconSymbol
-              ios_icon_name="bell.badge.fill"
-              android_material_icon_name="notifications-active"
-              size={24}
-              color={colors.success}
-            />
-            <Text style={styles.automationTitle}>Automated Reminders Active</Text>
-          </View>
-          <Text style={styles.automationText}>
-            {notificationStats.total} notifications scheduled automatically
-          </Text>
-          <Text style={styles.automationSubtext}>
-            • {notificationStats.inspections} WOF reminders
-          </Text>
-          <Text style={styles.automationSubtext}>
-            • {notificationStats.services} service reminders
-          </Text>
-          {notificationStats.merged > 0 && (
-            <Text style={styles.automationSubtext}>
-              • {notificationStats.merged} merged reminders (WOF & service on same day)
-            </Text>
-          )}
-          <Text style={styles.automationInfo}>
-            Customers will receive notifications 2 weeks before their due dates.
-          </Text>
-        </View>
-
-        <View style={styles.infoCard}>
-          <IconSymbol
-            ios_icon_name="info.circle"
-            android_material_icon_name="info"
-            size={20}
-            color={colors.primary}
-          />
-          <Text style={styles.infoText}>
-            {isSupabaseConfigured() 
-              ? 'Tap a reminder to send an automated email to the customer.'
-              : 'Set up Supabase email service to send automated email reminders.'}
-          </Text>
-        </View>
-
-        {Platform.OS === 'web' && (
-          <View style={[styles.infoCard, { backgroundColor: '#fff3cd', borderColor: '#ffc107' }]}>
-            <IconSymbol
-              ios_icon_name="exclamationmark.triangle"
-              android_material_icon_name="warning"
-              size={20}
-              color="#856404"
-            />
-            <Text style={[styles.infoText, { color: '#856404' }]}>
-              Web Mode: Ensure you are logged in. Check browser console (F12) for detailed logs if emails fail.
-            </Text>
-          </View>
-        )}
-
-        {overdueReminders.length > 0 && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>
-              Overdue ({overdueReminders.length})
-            </Text>
-            {overdueReminders.map((reminder, index) => (
-              <React.Fragment key={`overdue-${index}`}>
-                <Pressable
-                  style={({ pressed }) => [
-                    styles.reminderCard,
-                    styles.overdueCard,
-                    pressed && styles.cardPressed,
-                    sendingEmail === reminder.vehicleId && styles.cardDisabled,
-                  ]}
-                  onPress={() => {
-                    console.log('Reminder card pressed (overdue):', reminder.vehicleReg);
-                    if (sendingEmail !== reminder.vehicleId) {
-                      handleSendReminder(reminder);
-                    }
-                  }}
-                  disabled={sendingEmail === reminder.vehicleId}
-                >
-                  <View style={styles.reminderHeader}>
-                    <IconSymbol
-                      ios_icon_name="exclamationmark.triangle.fill"
-                      android_material_icon_name="warning"
-                      size={24}
-                      color={colors.error}
-                    />
-                    <View style={styles.reminderInfo}>
-                      <Text style={styles.reminderCustomer}>
-                        {reminder.customerName}
-                      </Text>
-                      <Text style={styles.reminderVehicle}>
-                        {reminder.vehicleReg} - {reminder.vehicleDetails}
-                      </Text>
-                      <Text style={styles.reminderType}>
-                        {getReminderTypeText(reminder)}
-                      </Text>
-                      <Text style={styles.reminderDate}>
-                        Due: {dateUtils.formatDate(reminder.dueDate)}
-                      </Text>
-                    </View>
-                    {sendingEmail === reminder.vehicleId ? (
-                      <ActivityIndicator size="small" color={colors.primary} />
-                    ) : (
-                      <IconSymbol
-                        ios_icon_name="chevron.right"
-                        android_material_icon_name="chevron-right"
-                        size={20}
-                        color={colors.textSecondary}
-                      />
-                    )}
-                  </View>
-                </Pressable>
-              </React.Fragment>
-            ))}
-          </View>
-        )}
-
-        {upcomingReminders.length > 0 && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>
-              Upcoming ({upcomingReminders.length})
-            </Text>
-            {upcomingReminders.map((reminder, index) => (
-              <React.Fragment key={`upcoming-${index}`}>
-                <Pressable
-                  style={({ pressed }) => [
-                    styles.reminderCard,
-                    pressed && styles.cardPressed,
-                    sendingEmail === reminder.vehicleId && styles.cardDisabled,
-                  ]}
-                  onPress={() => {
-                    console.log('Reminder card pressed (upcoming):', reminder.vehicleReg);
-                    if (sendingEmail !== reminder.vehicleId) {
-                      handleSendReminder(reminder);
-                    }
-                  }}
-                  disabled={sendingEmail === reminder.vehicleId}
-                >
-                  <View style={styles.reminderHeader}>
-                    <IconSymbol
-                      ios_icon_name={reminder.isMerged ? "bell.badge.fill" : "bell.fill"}
-                      android_material_icon_name="notifications"
-                      size={24}
-                      color={reminder.isMerged ? colors.success : colors.accent}
-                    />
-                    <View style={styles.reminderInfo}>
-                      <Text style={styles.reminderCustomer}>
-                        {reminder.customerName}
-                      </Text>
-                      <Text style={styles.reminderVehicle}>
-                        {reminder.vehicleReg} - {reminder.vehicleDetails}
-                      </Text>
-                      <Text style={styles.reminderType}>
-                        {getReminderTypeText(reminder)}
-                      </Text>
-                      <Text style={styles.reminderDate}>
-                        Due: {dateUtils.formatDate(reminder.dueDate)}
-                      </Text>
-                    </View>
-                    {sendingEmail === reminder.vehicleId ? (
-                      <ActivityIndicator size="small" color={colors.primary} />
-                    ) : (
-                      <IconSymbol
-                        ios_icon_name="chevron.right"
-                        android_material_icon_name="chevron-right"
-                        size={20}
-                        color={colors.textSecondary}
-                      />
-                    )}
-                  </View>
-                </Pressable>
-              </React.Fragment>
-            ))}
-          </View>
-        )}
-
-        {reminders.length === 0 && (
-          <View style={styles.emptyState}>
-            <IconSymbol
-              ios_icon_name="checkmark.circle"
-              android_material_icon_name="check-circle"
+              ios_icon_name="bell"
+              android_material_icon_name="notifications"
               size={64}
-              color={colors.success}
+              color={colors.textSecondary}
             />
-            <Text style={styles.emptyText}>All caught up!</Text>
-            <Text style={styles.emptySubtext}>
-              No upcoming reminders in the next 30 days
-            </Text>
+            <Text style={styles.emptyText}>No upcoming reminders</Text>
+            <Text style={styles.emptySubtext}>All vehicles are up to date!</Text>
           </View>
-        )}
+        ) : (
+          reminders.map((reminder, index) => {
+            const reminderTypeText = getReminderTypeText(reminder);
+            const dueDateDisplay = dateUtils.formatDate(reminder.dueDate);
+            const daysText = reminder.isOverdue
+              ? `${Math.abs(reminder.daysUntil)} days overdue`
+              : reminder.daysUntil === 0
+              ? 'Due today'
+              : `Due in ${reminder.daysUntil} days`;
+            
+            return (
+              <React.Fragment key={index}>
+                <View style={[styles.reminderCard, reminder.isOverdue && styles.reminderCardOverdue]}>
+                  <View style={styles.reminderHeader}>
+                    <View style={styles.reminderHeaderLeft}>
+                      <Text style={styles.reminderType}>{reminderTypeText}</Text>
+                      <View style={[styles.dueBadge, reminder.isOverdue && styles.dueBadgeOverdue]}>
+                        <Text style={styles.dueText}>{daysText}</Text>
+                      </View>
+                    </View>
+                  </View>
 
-        <AppFooter />
+                  <View style={styles.reminderBody}>
+                    <View style={styles.infoRow}>
+                      <IconSymbol
+                        ios_icon_name="person.fill"
+                        android_material_icon_name="person"
+                        size={16}
+                        color={colors.textSecondary}
+                      />
+                      <Text style={styles.infoText}>{reminder.customerName}</Text>
+                    </View>
+                    <View style={styles.infoRow}>
+                      <IconSymbol
+                        ios_icon_name="car.fill"
+                        android_material_icon_name="directions-car"
+                        size={16}
+                        color={colors.textSecondary}
+                      />
+                      <Text style={styles.infoText}>{reminder.vehicleReg} - {reminder.vehicleDetails}</Text>
+                    </View>
+                    <View style={styles.infoRow}>
+                      <IconSymbol
+                        ios_icon_name="calendar"
+                        android_material_icon_name="calendar-today"
+                        size={16}
+                        color={colors.textSecondary}
+                      />
+                      <Text style={styles.infoText}>Due: {dueDateDisplay}</Text>
+                    </View>
+                  </View>
+
+                  <View style={styles.reminderActions}>
+                    {reminder.customerPhone && (
+                      <TouchableOpacity
+                        style={styles.actionButton}
+                        onPress={() => Linking.openURL(`tel:${reminder.customerPhone}`)}
+                        activeOpacity={0.7}
+                      >
+                        <IconSymbol
+                          ios_icon_name="phone.fill"
+                          android_material_icon_name="phone"
+                          size={20}
+                          color={colors.primary}
+                        />
+                        <Text style={styles.actionButtonText}>Call</Text>
+                      </TouchableOpacity>
+                    )}
+                    {reminder.customerMobile && (
+                      <TouchableOpacity
+                        style={styles.actionButton}
+                        onPress={() => Linking.openURL(`sms:${reminder.customerMobile}`)}
+                        activeOpacity={0.7}
+                      >
+                        <IconSymbol
+                          ios_icon_name="message.fill"
+                          android_material_icon_name="message"
+                          size={20}
+                          color={colors.primary}
+                        />
+                        <Text style={styles.actionButtonText}>SMS</Text>
+                      </TouchableOpacity>
+                    )}
+                    <TouchableOpacity
+                      style={styles.actionButton}
+                      onPress={() => handleSendReminder(reminder)}
+                      activeOpacity={0.7}
+                    >
+                      <IconSymbol
+                        ios_icon_name="envelope.fill"
+                        android_material_icon_name="email"
+                        size={20}
+                        color={colors.primary}
+                      />
+                      <Text style={styles.actionButtonText}>Email</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              </React.Fragment>
+            );
+          })
+        )}
       </ScrollView>
 
-      {/* Confirmation Modal for Email Sending */}
-      <Modal
-        visible={confirmModalVisible}
-        transparent={true}
-        animationType="fade"
-        onRequestClose={handleCancelSendEmail}
-      >
+      {/* Email Confirmation Modal */}
+      <Modal visible={showEmailModal} animationType="fade" transparent>
         <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <IconSymbol
-                ios_icon_name="envelope.fill"
-                android_material_icon_name="email"
-                size={32}
-                color={colors.primary}
-              />
-              <Text style={styles.modalTitle}>Send Email Reminder</Text>
-            </View>
-            
-            {selectedReminder && (
-              <View style={styles.modalBody}>
-                <Text style={styles.modalText}>
-                  Send automated email reminder to:
-                </Text>
-                <Text style={styles.modalCustomerName}>
-                  {selectedReminder.customerName}
-                </Text>
-                <Text style={styles.modalEmail}>
-                  {selectedReminder.customerEmail}
-                </Text>
-                <View style={styles.modalDivider} />
-                <Text style={styles.modalVehicleInfo}>
-                  {selectedReminder.vehicleReg} - {selectedReminder.vehicleDetails}
-                </Text>
-                <Text style={styles.modalReminderType}>
-                  {getReminderTypeText(selectedReminder)}
-                </Text>
-              </View>
-            )}
-
+          <View style={styles.modal}>
+            <Text style={styles.modalTitle}>Send Email Reminder?</Text>
+            <Text style={styles.modalText}>
+              Send a reminder email to {selectedReminder?.customerName} at {selectedReminder?.customerEmail}?
+            </Text>
             <View style={styles.modalButtons}>
               <TouchableOpacity
-                style={[styles.modalButton, styles.modalButtonCancel]}
+                style={styles.modalCancel}
                 onPress={handleCancelSendEmail}
+                disabled={sendingEmail}
+                activeOpacity={0.7}
               >
-                <Text style={styles.modalButtonTextCancel}>Cancel</Text>
+                <Text style={styles.modalCancelText}>Cancel</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={[styles.modalButton, styles.modalButtonConfirm]}
+                style={[styles.modalConfirm, sendingEmail && styles.modalConfirmDisabled]}
                 onPress={handleConfirmSendEmail}
+                disabled={sendingEmail}
+                activeOpacity={0.7}
               >
-                <Text style={styles.modalButtonTextConfirm}>Send Email</Text>
+                {sendingEmail ? (
+                  <ActivityIndicator color="#FFFFFF" />
+                ) : (
+                  <Text style={styles.modalConfirmText}>Send</Text>
+                )}
               </TouchableOpacity>
             </View>
           </View>
         </View>
       </Modal>
+
+      <AppFooter />
     </View>
   );
 }
@@ -733,162 +471,57 @@ const styles = StyleSheet.create({
   },
   backButton: {
     padding: 8,
-    borderRadius: 8,
-    ...(Platform.OS === 'web' && {
-      cursor: 'pointer',
-      userSelect: 'none',
-    }),
-  },
-  buttonPressed: {
-    opacity: 0.6,
-    backgroundColor: colors.border,
   },
   title: {
     fontSize: 20,
     fontWeight: 'bold',
     color: colors.text,
   },
+  statsContainer: {
+    flexDirection: 'row',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    gap: 12,
+  },
+  statCard: {
+    flex: 1,
+    backgroundColor: colors.card,
+    borderRadius: 12,
+    padding: 16,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  statValue: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: colors.primary,
+    marginBottom: 4,
+  },
+  statLabel: {
+    fontSize: 11,
+    color: colors.textSecondary,
+    textAlign: 'center',
+  },
   scrollView: {
     flex: 1,
   },
   scrollContent: {
     padding: 20,
-    paddingBottom: 120,
+    paddingBottom: 100,
   },
-  automationCard: {
-    backgroundColor: '#e8f5e9',
-    padding: 16,
-    borderRadius: 12,
-    marginBottom: 16,
-    borderWidth: 2,
-    borderColor: colors.success,
-  },
-  automationHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    marginBottom: 8,
-  },
-  automationTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: colors.text,
-  },
-  automationText: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: colors.text,
-    marginBottom: 8,
-  },
-  automationSubtext: {
-    fontSize: 14,
-    color: colors.textSecondary,
-    marginLeft: 8,
-    marginBottom: 4,
-  },
-  automationInfo: {
-    fontSize: 13,
-    color: colors.textSecondary,
-    marginTop: 8,
-    fontStyle: 'italic',
-  },
-  infoCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#e3f2fd',
-    padding: 12,
-    borderRadius: 8,
-    marginBottom: 12,
-    gap: 10,
-    borderWidth: 1,
-    borderColor: colors.primary,
-  },
-  infoText: {
+  loadingContainer: {
     flex: 1,
-    fontSize: 14,
-    color: colors.text,
-  },
-  section: {
-    marginBottom: 24,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: colors.text,
-    marginBottom: 12,
-  },
-  reminderCard: {
-    backgroundColor: colors.card,
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
-    borderWidth: 1,
-    borderColor: colors.border,
-    boxShadow: '0px 2px 4px rgba(0, 0, 0, 0.05)',
-    elevation: 2,
-    ...(Platform.OS === 'web' && {
-      cursor: 'pointer',
-      userSelect: 'none',
-      transition: 'all 0.2s ease',
-    }),
-  },
-  overdueCard: {
-    borderColor: colors.error,
-    borderWidth: 2,
-  },
-  cardPressed: {
-    opacity: 0.7,
-    transform: [{ scale: 0.98 }],
-    backgroundColor: colors.highlight,
-  },
-  cardDisabled: {
-    opacity: 0.6,
-    ...(Platform.OS === 'web' && {
-      cursor: 'not-allowed',
-    }),
-  },
-  reminderHeader: {
-    flexDirection: 'row',
+    justifyContent: 'center',
     alignItems: 'center',
-    gap: 12,
   },
-  reminderInfo: {
-    flex: 1,
-  },
-  reminderCustomer: {
+  loadingText: {
     fontSize: 16,
-    fontWeight: 'bold',
-    color: colors.text,
-    marginBottom: 4,
-    ...(Platform.OS === 'web' && {
-      userSelect: 'none',
-    }),
-  },
-  reminderVehicle: {
-    fontSize: 14,
     color: colors.textSecondary,
-    marginBottom: 4,
-    ...(Platform.OS === 'web' && {
-      userSelect: 'none',
-    }),
+    marginTop: 12,
   },
-  reminderType: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: colors.text,
-    marginBottom: 2,
-    ...(Platform.OS === 'web' && {
-      userSelect: 'none',
-    }),
-  },
-  reminderDate: {
-    fontSize: 13,
-    color: colors.textSecondary,
-    ...(Platform.OS === 'web' && {
-      userSelect: 'none',
-    }),
-  },
-  emptyState: {
+  emptyContainer: {
+    flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 60,
@@ -905,6 +538,85 @@ const styles = StyleSheet.create({
     marginTop: 8,
     textAlign: 'center',
   },
+  reminderCard: {
+    backgroundColor: colors.card,
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  reminderCardOverdue: {
+    borderColor: colors.error,
+    borderWidth: 2,
+  },
+  reminderHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  reminderHeaderLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  reminderType: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: colors.text,
+  },
+  dueBadge: {
+    backgroundColor: colors.primary,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  dueBadgeOverdue: {
+    backgroundColor: colors.error,
+  },
+  dueText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#FFFFFF',
+  },
+  reminderBody: {
+    marginBottom: 12,
+  },
+  infoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 6,
+  },
+  infoText: {
+    fontSize: 14,
+    color: colors.text,
+  },
+  reminderActions: {
+    flexDirection: 'row',
+    gap: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+  },
+  actionButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.background,
+    borderRadius: 8,
+    padding: 10,
+    gap: 6,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  actionButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.primary,
+  },
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
@@ -912,93 +624,54 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 20,
   },
-  modalContent: {
+  modal: {
     backgroundColor: colors.card,
     borderRadius: 16,
     padding: 24,
     width: '100%',
     maxWidth: 400,
-    boxShadow: '0px 4px 20px rgba(0, 0, 0, 0.15)',
-    elevation: 5,
-  },
-  modalHeader: {
-    alignItems: 'center',
-    marginBottom: 20,
   },
   modalTitle: {
     fontSize: 20,
     fontWeight: 'bold',
     color: colors.text,
-    marginTop: 12,
-    textAlign: 'center',
-  },
-  modalBody: {
-    marginBottom: 24,
+    marginBottom: 12,
   },
   modalText: {
-    fontSize: 15,
+    fontSize: 16,
     color: colors.textSecondary,
-    marginBottom: 12,
-    textAlign: 'center',
-  },
-  modalCustomerName: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: colors.text,
-    textAlign: 'center',
-    marginBottom: 4,
-  },
-  modalEmail: {
-    fontSize: 15,
-    color: colors.primary,
-    textAlign: 'center',
-    marginBottom: 16,
-  },
-  modalDivider: {
-    height: 1,
-    backgroundColor: colors.border,
-    marginVertical: 16,
-  },
-  modalVehicleInfo: {
-    fontSize: 14,
-    color: colors.text,
-    textAlign: 'center',
-    marginBottom: 8,
-  },
-  modalReminderType: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: colors.text,
-    textAlign: 'center',
+    lineHeight: 24,
+    marginBottom: 24,
   },
   modalButtons: {
     flexDirection: 'row',
     gap: 12,
   },
-  modalButton: {
+  modalCancel: {
     flex: 1,
-    paddingVertical: 14,
-    paddingHorizontal: 20,
-    borderRadius: 10,
+    backgroundColor: colors.background,
+    borderRadius: 8,
+    padding: 14,
     alignItems: 'center',
-    justifyContent: 'center',
-    ...(Platform.OS === 'web' && {
-      cursor: 'pointer',
-      userSelect: 'none',
-    }),
+    borderWidth: 1,
+    borderColor: colors.border,
   },
-  modalButtonCancel: {
-    backgroundColor: colors.border,
-  },
-  modalButtonConfirm: {
-    backgroundColor: colors.primary,
-  },
-  modalButtonTextCancel: {
+  modalCancelText: {
     fontSize: 16,
     fontWeight: '600',
     color: colors.text,
   },
-  modalButtonTextConfirm: {
+  modalConfirm: {
+    flex: 1,
+    backgroundColor: colors.primary,
+    borderRadius: 8,
+    padding: 14,
+    alignItems: 'center',
+  },
+  modalConfirmDisabled: {
+    opacity: 0.6,
+  },
+  modalConfirmText: {
     fontSize: 16,
     fontWeight: '600',
     color: '#FFFFFF',

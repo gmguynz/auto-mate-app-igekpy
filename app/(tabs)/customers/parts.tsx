@@ -72,12 +72,8 @@ export default function PartsScreen() {
   };
 
   const handleBack = () => {
-    console.log('User tapped back button');
-    if (router.canGoBack()) {
-      router.back();
-    } else {
-      router.replace('/(tabs)/(home)');
-    }
+    console.log('User tapped back button - navigating back');
+    router.back();
   };
 
   const openAddModal = () => {

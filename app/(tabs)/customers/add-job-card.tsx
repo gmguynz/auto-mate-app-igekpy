@@ -28,7 +28,6 @@ export default function AddJobCardScreen() {
   const jobCardId = params.id as string | undefined;
   const preselectedCustomerId = params.customerId as string | undefined;
   const preselectedVehicleId = params.vehicleId as string | undefined;
-  const returnTo = params.returnTo as string | undefined;
   const { isAdmin } = useAuth();
 
   const [loading, setLoading] = useState(false);
@@ -140,12 +139,8 @@ export default function AddJobCardScreen() {
   };
 
   const handleBack = () => {
-    console.log('User tapped back button, returnTo:', returnTo);
-    if (returnTo === 'home') {
-      router.replace('/(tabs)/(home)');
-    } else {
-      router.back();
-    }
+    console.log('User tapped back button - navigating back');
+    router.back();
   };
 
   const handleSave = async () => {
@@ -200,11 +195,7 @@ export default function AddJobCardScreen() {
         console.log('Job card created successfully');
       }
 
-      if (returnTo === 'home') {
-        router.replace('/(tabs)/(home)');
-      } else {
-        router.back();
-      }
+      router.back();
     } catch (error: any) {
       console.error('Error saving job card:', error);
       showErrorModal(error.message || 'Failed to save job card');
