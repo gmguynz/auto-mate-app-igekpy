@@ -18,7 +18,8 @@ export interface JobCard {
   wofExpiry?: string;
   serviceDueDate?: string;
   status: 'open' | 'in_progress' | 'completed' | 'cancelled';
-  description: string;
+  description?: string; // Made optional - description of work required
+  workDone?: string; // New field - description of work that has been done
   notes: string;
   partsUsed: JobCardPart[];
   labourEntries: JobCardLabour[];
@@ -67,8 +68,13 @@ export interface JobCardFormData {
   odometer: string;
   wofExpiry: string;
   serviceDueDate: string;
-  description: string;
+  description?: string; // Made optional
+  workDone?: string; // New field
   notes: string;
   partsUsed: JobCardPart[];
   labourEntries: JobCardLabour[];
+}
+
+export interface AppSettings {
+  defaultHourlyRate: number;
 }

@@ -1,6 +1,6 @@
 
 import { supabase, isSupabaseConfigured } from '@/integrations/supabase/client';
-import { JobCard, Part, JobCardPart, JobCardLabour } from '@/types/jobCard';
+import { JobCard, Part, JobCardPart, JobCardLabour, AppSettings } from '@/types/jobCard';
 import { Customer } from '@/types/customer';
 
 // Retry configuration
@@ -119,7 +119,8 @@ export const jobCardStorage = {
           wofExpiry: item.wof_expiry || undefined,
           serviceDueDate: item.service_due_date || undefined,
           status: item.status,
-          description: item.description || '',
+          description: item.description || undefined,
+          workDone: item.work_done || undefined,
           notes: item.notes || '',
           partsUsed: item.parts_used || [],
           labourEntries: item.labour_entries || [],
@@ -181,7 +182,8 @@ export const jobCardStorage = {
           wofExpiry: data.wof_expiry || undefined,
           serviceDueDate: data.service_due_date || undefined,
           status: data.status,
-          description: data.description || '',
+          description: data.description || undefined,
+          workDone: data.work_done || undefined,
           notes: data.notes || '',
           partsUsed: data.parts_used || [],
           labourEntries: data.labour_entries || [],
@@ -235,7 +237,8 @@ export const jobCardStorage = {
         wof_expiry: jobCard.wofExpiry || null,
         service_due_date: jobCard.serviceDueDate || null,
         status: jobCard.status || 'open',
-        description: jobCard.description || '',
+        description: jobCard.description || null,
+        work_done: jobCard.workDone || null,
         notes: jobCard.notes || '',
         parts_used: jobCard.partsUsed || [],
         labour_entries: jobCard.labourEntries || [],
@@ -251,7 +254,7 @@ export const jobCardStorage = {
         throw error;
       }
       
-      console.log('Job card added successfully to Supabase');
+      console.log('Job card added successfully to Supabase with job number:', jobNumber);
     }, 'addJobCard');
   },
 
@@ -273,7 +276,8 @@ export const jobCardStorage = {
         wof_expiry: updatedJobCard.wofExpiry || null,
         service_due_date: updatedJobCard.serviceDueDate || null,
         status: updatedJobCard.status,
-        description: updatedJobCard.description,
+        description: updatedJobCard.description || null,
+        work_done: updatedJobCard.workDone || null,
         notes: updatedJobCard.notes,
         parts_used: updatedJobCard.partsUsed || [],
         labour_entries: updatedJobCard.labourEntries || [],
@@ -362,7 +366,8 @@ export const jobCardStorage = {
           wofExpiry: item.wof_expiry || undefined,
           serviceDueDate: item.service_due_date || undefined,
           status: item.status,
-          description: item.description || '',
+          description: item.description || undefined,
+          workDone: item.work_done || undefined,
           notes: item.notes || '',
           partsUsed: item.parts_used || [],
           labourEntries: item.labour_entries || [],
@@ -563,5 +568,60 @@ export const jobCardStorage = {
       console.error('Error getting technicians:', error);
       return [];
     }
+  },
+
+  // App Settings
+  async getSettings(): Promise<AppSettings> {
+    try {
+      if (!this.isConfigured()) {
+        console.log('Supabase not configured, returning default settings');
+        return { defaultHourlyRate: 0 };
+      }
+
+      return await retryOperation(async () => {
+        const { data, error } = await supabase
+          .from('app_settings')
+          .select('*')
+          .eq('key', 'default_hourly_rate')
+          .single();
+
+        if (error && error.code !== 'PGRST116') {
+          console.error('Error getting settings from Supabase:', error);
+          throw error;
+        }
+
+        return {
+          defaultHourlyRate: data ? parseFloat(data.value) : 0,
+        };
+      }, 'getSettings');
+    } catch (error: any) {
+      console.error('Error getting settings:', error);
+      return { defaultHourlyRate: 0 };
+    }
+  },
+
+  async updateSettings(settings: AppSettings): Promise<void> {
+    if (!this.isConfigured()) {
+      throw new Error('Database not configured. Please contact your administrator.');
+    }
+
+    await retryOperation(async () => {
+      const { error } = await supabase
+        .from('app_settings')
+        .upsert({
+          key: 'default_hourly_rate',
+          value: settings.defaultHourlyRate.toString(),
+          updated_at: new Date().toISOString(),
+        }, {
+          onConflict: 'key'
+        });
+
+      if (error) {
+        console.error('Error updating settings in Supabase:', error);
+        throw error;
+      }
+      
+      console.log('Settings updated successfully in Supabase');
+    }, 'updateSettings');
   },
 };

@@ -33,6 +33,7 @@ export default function AddJobCardScreen() {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [technicians, setTechnicians] = useState<Array<{ id: string; name: string; email: string }>>([]);
   const [parts, setParts] = useState<Part[]>([]);
+  const [defaultHourlyRate, setDefaultHourlyRate] = useState(0);
   
   // Form state
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
@@ -43,6 +44,7 @@ export default function AddJobCardScreen() {
   const [wofExpiry, setWofExpiry] = useState('');
   const [serviceDueDate, setServiceDueDate] = useState('');
   const [description, setDescription] = useState('');
+  const [workDone, setWorkDone] = useState('');
   const [notes, setNotes] = useState('');
   const [partsUsed, setPartsUsed] = useState<JobCardPart[]>([]);
   const [labourEntries, setLabourEntries] = useState<JobCardLabour[]>([]);
@@ -68,16 +70,18 @@ export default function AddJobCardScreen() {
   const loadData = async () => {
     setLoading(true);
     try {
-      console.log('Loading customers, technicians, and parts...');
-      const [customersData, techniciansData, partsData] = await Promise.all([
+      console.log('Loading customers, technicians, parts, and settings...');
+      const [customersData, techniciansData, partsData, settings] = await Promise.all([
         storageUtils.getCustomers(),
         jobCardStorage.getTechnicians(),
         jobCardStorage.getParts(),
+        jobCardStorage.getSettings(),
       ]);
       
       setCustomers(customersData);
       setTechnicians(techniciansData);
       setParts(partsData);
+      setDefaultHourlyRate(settings.defaultHourlyRate);
       
       // If editing, load job card
       if (jobCardId) {
@@ -120,7 +124,8 @@ export default function AddJobCardScreen() {
     setOdometer(jobCard.odometer?.toString() || '');
     setWofExpiry(jobCard.wofExpiry || '');
     setServiceDueDate(jobCard.serviceDueDate || '');
-    setDescription(jobCard.description);
+    setDescription(jobCard.description || '');
+    setWorkDone(jobCard.workDone || '');
     setNotes(jobCard.notes);
     setPartsUsed(jobCard.partsUsed || []);
     setLabourEntries(jobCard.labourEntries || []);
@@ -144,11 +149,6 @@ export default function AddJobCardScreen() {
       showErrorModal('Please select a technician');
       return;
     }
-    
-    if (!description.trim()) {
-      showErrorModal('Please enter a description');
-      return;
-    }
 
     setSaving(true);
     try {
@@ -160,7 +160,8 @@ export default function AddJobCardScreen() {
         odometer: odometer ? parseInt(odometer) : undefined,
         wofExpiry: wofExpiry || undefined,
         serviceDueDate: serviceDueDate || undefined,
-        description: description.trim(),
+        description: description.trim() || undefined,
+        workDone: workDone.trim() || undefined,
         notes: notes.trim(),
         partsUsed,
         labourEntries,
@@ -239,7 +240,7 @@ export default function AddJobCardScreen() {
       id: Date.now().toString(),
       description: '',
       hours: 0,
-      ratePerHour: 0,
+      ratePerHour: defaultHourlyRate,
     };
     setLabourEntries([...labourEntries, newEntry]);
   };
@@ -474,18 +475,29 @@ export default function AddJobCardScreen() {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Work Description</Text>
           
-          <Text style={styles.label}>Description *</Text>
+          <Text style={styles.label}>Description of Work Required</Text>
           <TextInput
             style={[styles.input, styles.textArea]}
             value={description}
             onChangeText={setDescription}
-            placeholder="Describe the work to be done"
+            placeholder="Describe the work to be done (optional)"
             placeholderTextColor={colors.textSecondary}
             multiline
             numberOfLines={4}
           />
 
-          <Text style={styles.label}>Notes</Text>
+          <Text style={styles.label}>Description of Work Done</Text>
+          <TextInput
+            style={[styles.input, styles.textArea]}
+            value={workDone}
+            onChangeText={setWorkDone}
+            placeholder="Describe the work that has been completed"
+            placeholderTextColor={colors.textSecondary}
+            multiline
+            numberOfLines={4}
+          />
+
+          <Text style={styles.label}>Additional Notes</Text>
           <TextInput
             style={[styles.input, styles.textArea]}
             value={notes}
@@ -573,6 +585,20 @@ export default function AddJobCardScreen() {
               />
             </TouchableOpacity>
           </View>
+
+          {defaultHourlyRate > 0 && (
+            <View style={styles.infoBox}>
+              <IconSymbol
+                ios_icon_name="info.circle.fill"
+                android_material_icon_name="info"
+                size={16}
+                color={colors.primary}
+              />
+              <Text style={styles.infoText}>
+                Default hourly rate: {formatCurrency(defaultHourlyRate)}/hr
+              </Text>
+            </View>
+          )}
 
           {labourEntries.map((labour, index) => (
             <View key={index} style={styles.itemCard}>
@@ -957,6 +983,20 @@ const styles = StyleSheet.create({
   },
   addButton: {
     padding: 4,
+  },
+  infoBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.highlight,
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 12,
+    gap: 8,
+  },
+  infoText: {
+    fontSize: 14,
+    color: colors.text,
+    flex: 1,
   },
   itemCard: {
     backgroundColor: colors.card,
