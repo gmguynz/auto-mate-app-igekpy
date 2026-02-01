@@ -18,9 +18,11 @@ import { IconSymbol } from '@/components/IconSymbol';
 import { JobCard } from '@/types/jobCard';
 import { jobCardStorage } from '@/utils/jobCardStorage';
 import { dateUtils } from '@/utils/dateUtils';
+import { useAuth } from '@/contexts/AuthContext';
 
 export default function JobCardsScreen() {
   const router = useRouter();
+  const { isAdmin } = useAuth();
   const [jobCards, setJobCards] = useState<JobCard[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -113,6 +115,14 @@ export default function JobCardsScreen() {
     return (
       <View style={styles.container}>
         <View style={styles.header}>
+          <TouchableOpacity onPress={() => router.back()} style={styles.backButton} activeOpacity={0.7}>
+            <IconSymbol
+              ios_icon_name="chevron.left"
+              android_material_icon_name="arrow-back"
+              size={24}
+              color={colors.text}
+            />
+          </TouchableOpacity>
           <Text style={styles.title}>Job Cards</Text>
           <View style={{ width: 40 }} />
         </View>
@@ -132,6 +142,14 @@ export default function JobCardsScreen() {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
+        <TouchableOpacity onPress={() => router.back()} style={styles.backButton} activeOpacity={0.7}>
+          <IconSymbol
+            ios_icon_name="chevron.left"
+            android_material_icon_name="arrow-back"
+            size={24}
+            color={colors.text}
+          />
+        </TouchableOpacity>
         <Text style={styles.title}>Job Cards</Text>
         <TouchableOpacity
           onPress={() => router.push('/customers/add-job-card')}
@@ -266,63 +284,82 @@ export default function JobCardsScreen() {
             </Text>
           </View>
         ) : (
-          filteredJobCards.map((jobCard, index) => (
-            <React.Fragment key={index}>
-              <TouchableOpacity
-                style={styles.jobCardItem}
-                onPress={() => router.push(`/customers/job-card-detail?id=${jobCard.id}`)}
-                activeOpacity={0.7}
-              >
-                <View style={styles.jobCardHeader}>
-                  <View style={styles.jobCardHeaderLeft}>
-                    <Text style={styles.jobNumber}>{jobCard.jobNumber}</Text>
-                    <View style={[styles.statusBadge, { backgroundColor: getStatusColor(jobCard.status) }]}>
-                      <Text style={styles.statusText}>{getStatusLabel(jobCard.status)}</Text>
+          filteredJobCards.map((jobCard, index) => {
+            const vehicleInfo = `${jobCard.vehicleReg} - ${jobCard.vehicleMake} ${jobCard.vehicleModel}`;
+            const jobDate = dateUtils.formatDate(jobCard.createdAt);
+            const statusColor = getStatusColor(jobCard.status);
+            const statusLabel = getStatusLabel(jobCard.status);
+            const totalCostDisplay = formatCurrency(jobCard.totalCost);
+            
+            return (
+              <React.Fragment key={index}>
+                <TouchableOpacity
+                  style={styles.jobCardItem}
+                  onPress={() => router.push(`/customers/job-card-detail?id=${jobCard.id}`)}
+                  activeOpacity={0.7}
+                >
+                  <View style={styles.jobCardHeader}>
+                    <View style={styles.jobCardHeaderLeft}>
+                      <Text style={styles.jobNumber}>{jobCard.jobNumber}</Text>
+                      <View style={[styles.statusBadge, { backgroundColor: statusColor }]}>
+                        <Text style={styles.statusText}>{statusLabel}</Text>
+                      </View>
                     </View>
+                    <Text style={styles.jobCardDate}>{jobDate}</Text>
                   </View>
-                  <Text style={styles.jobCardDate}>{dateUtils.formatDate(jobCard.createdAt)}</Text>
-                </View>
 
-                <View style={styles.jobCardBody}>
-                  <View style={styles.infoRow}>
-                    <IconSymbol
-                      ios_icon_name="person.fill"
-                      android_material_icon_name="person"
-                      size={16}
-                      color={colors.textSecondary}
-                    />
-                    <Text style={styles.infoText}>{jobCard.customerName}</Text>
+                  <View style={styles.jobCardBody}>
+                    <View style={styles.infoRow}>
+                      <IconSymbol
+                        ios_icon_name="person.fill"
+                        android_material_icon_name="person"
+                        size={16}
+                        color={colors.textSecondary}
+                      />
+                      <Text style={styles.infoText}>{jobCard.customerName}</Text>
+                    </View>
+                    <View style={styles.infoRow}>
+                      <IconSymbol
+                        ios_icon_name="car.fill"
+                        android_material_icon_name="directions-car"
+                        size={16}
+                        color={colors.textSecondary}
+                      />
+                      <Text style={styles.infoText}>{vehicleInfo}</Text>
+                    </View>
+                    {jobCard.description && (
+                      <Text style={styles.description} numberOfLines={2}>
+                        {jobCard.description}
+                      </Text>
+                    )}
                   </View>
-                  <View style={styles.infoRow}>
-                    <IconSymbol
-                      ios_icon_name="car.fill"
-                      android_material_icon_name="directions-car"
-                      size={16}
-                      color={colors.textSecondary}
-                    />
-                    <Text style={styles.infoText}>
-                      {jobCard.vehicleReg} - {jobCard.vehicleMake} {jobCard.vehicleModel}
-                    </Text>
-                  </View>
-                  {jobCard.description && (
-                    <Text style={styles.description} numberOfLines={2}>
-                      {jobCard.description}
-                    </Text>
+
+                  {isAdmin && (
+                    <View style={styles.jobCardFooter}>
+                      <Text style={styles.totalCost}>{totalCostDisplay}</Text>
+                      <IconSymbol
+                        ios_icon_name="chevron.right"
+                        android_material_icon_name="chevron-right"
+                        size={20}
+                        color={colors.textSecondary}
+                      />
+                    </View>
                   )}
-                </View>
-
-                <View style={styles.jobCardFooter}>
-                  <Text style={styles.totalCost}>{formatCurrency(jobCard.totalCost)}</Text>
-                  <IconSymbol
-                    ios_icon_name="chevron.right"
-                    android_material_icon_name="chevron-right"
-                    size={20}
-                    color={colors.textSecondary}
-                  />
-                </View>
-              </TouchableOpacity>
-            </React.Fragment>
-          ))
+                  
+                  {!isAdmin && (
+                    <View style={styles.jobCardFooterNoPrice}>
+                      <IconSymbol
+                        ios_icon_name="chevron.right"
+                        android_material_icon_name="chevron-right"
+                        size={20}
+                        color={colors.textSecondary}
+                      />
+                    </View>
+                  )}
+                </TouchableOpacity>
+              </React.Fragment>
+            );
+          })
         )}
       </ScrollView>
     </View>
@@ -345,10 +382,17 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
   },
+  backButton: {
+    padding: 8,
+    cursor: Platform.OS === 'web' ? 'pointer' : undefined,
+    userSelect: Platform.OS === 'web' ? 'none' : undefined,
+  },
   title: {
     fontSize: 28,
     fontWeight: 'bold',
     color: colors.text,
+    flex: 1,
+    textAlign: 'center',
   },
   addButton: {
     padding: 8,
@@ -530,6 +574,14 @@ const styles = StyleSheet.create({
   jobCardFooter: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+  },
+  jobCardFooterNoPrice: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
     alignItems: 'center',
     paddingTop: 12,
     borderTopWidth: 1,

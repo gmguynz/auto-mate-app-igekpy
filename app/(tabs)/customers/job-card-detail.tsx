@@ -165,6 +165,8 @@ export default function JobCardDetailScreen() {
   const updatedDate = dateUtils.formatDate(jobCard.updatedAt);
   const completedDate = jobCard.completedAt ? dateUtils.formatDate(jobCard.completedAt) : null;
   const vehicleMakeModel = `${jobCard.vehicleMake} ${jobCard.vehicleModel}`;
+  const statusColor = getStatusColor(jobCard.status);
+  const statusLabel = getStatusLabel(jobCard.status);
 
   return (
     <View style={styles.container}>
@@ -206,12 +208,12 @@ export default function JobCardDetailScreen() {
             <Text style={styles.jobNumber}>{jobCard.jobNumber}</Text>
           </View>
           <TouchableOpacity
-            style={[styles.statusBadge, { backgroundColor: getStatusColor(jobCard.status) }]}
+            style={[styles.statusBadge, { backgroundColor: statusColor }]}
             onPress={handleStatusClick}
             activeOpacity={isAdmin ? 0.7 : 1}
             disabled={!isAdmin}
           >
-            <Text style={styles.statusText}>{getStatusLabel(jobCard.status)}</Text>
+            <Text style={styles.statusText}>{statusLabel}</Text>
             {isAdmin && (
               <IconSymbol
                 ios_icon_name="chevron.down"
@@ -337,11 +339,11 @@ export default function JobCardDetailScreen() {
                 <View key={index} style={styles.itemCard}>
                   <View style={styles.itemHeader}>
                     <Text style={styles.itemName}>{part.partName}</Text>
-                    <Text style={styles.itemPrice}>{partTotal}</Text>
+                    {isAdmin && <Text style={styles.itemPrice}>{partTotal}</Text>}
                   </View>
                   <View style={styles.itemDetails}>
                     <Text style={styles.itemDetailText}>{partQuantity}</Text>
-                    <Text style={styles.itemDetailText}>{partPrice}</Text>
+                    {isAdmin && <Text style={styles.itemDetailText}>{partPrice}</Text>}
                   </View>
                 </View>
               );
@@ -363,11 +365,11 @@ export default function JobCardDetailScreen() {
                 <View key={index} style={styles.itemCard}>
                   <View style={styles.itemHeader}>
                     <Text style={styles.itemName}>{labourDesc}</Text>
-                    <Text style={styles.itemPrice}>{labourTotal}</Text>
+                    {isAdmin && <Text style={styles.itemPrice}>{labourTotal}</Text>}
                   </View>
                   <View style={styles.itemDetails}>
                     <Text style={styles.itemDetailText}>{labourHours}</Text>
-                    <Text style={styles.itemDetailText}>{labourRate}</Text>
+                    {isAdmin && <Text style={styles.itemDetailText}>{labourRate}</Text>}
                   </View>
                 </View>
               );
@@ -375,39 +377,41 @@ export default function JobCardDetailScreen() {
           </View>
         )}
 
-        {/* Cost Breakdown */}
-        <View style={styles.costBreakdownSection}>
-          <Text style={styles.costBreakdownTitle}>Cost Breakdown</Text>
-          
-          <View style={styles.costRow}>
-            <Text style={styles.costLabel}>Parts:</Text>
-            <Text style={styles.costValue}>{formatCurrency(jobCard.partsCost)}</Text>
+        {/* Cost Breakdown - Admin Only */}
+        {isAdmin && (
+          <View style={styles.costBreakdownSection}>
+            <Text style={styles.costBreakdownTitle}>Cost Breakdown</Text>
+            
+            <View style={styles.costRow}>
+              <Text style={styles.costLabel}>Parts:</Text>
+              <Text style={styles.costValue}>{formatCurrency(jobCard.partsCost)}</Text>
+            </View>
+            
+            <View style={styles.costRow}>
+              <Text style={styles.costLabel}>Labour:</Text>
+              <Text style={styles.costValue}>{formatCurrency(jobCard.labourCost)}</Text>
+            </View>
+            
+            <View style={styles.costDivider} />
+            
+            <View style={styles.costRow}>
+              <Text style={styles.costLabel}>Subtotal:</Text>
+              <Text style={styles.costValue}>{formatCurrency(subtotal)}</Text>
+            </View>
+            
+            <View style={styles.costRow}>
+              <Text style={styles.costLabel}>Tax ({taxRate}%):</Text>
+              <Text style={styles.costValue}>{formatCurrency(taxAmount)}</Text>
+            </View>
+            
+            <View style={styles.costDivider} />
+            
+            <View style={styles.costRow}>
+              <Text style={styles.costLabelTotal}>Total:</Text>
+              <Text style={styles.costValueTotal}>{formatCurrency(totalWithTax)}</Text>
+            </View>
           </View>
-          
-          <View style={styles.costRow}>
-            <Text style={styles.costLabel}>Labour:</Text>
-            <Text style={styles.costValue}>{formatCurrency(jobCard.labourCost)}</Text>
-          </View>
-          
-          <View style={styles.costDivider} />
-          
-          <View style={styles.costRow}>
-            <Text style={styles.costLabel}>Subtotal:</Text>
-            <Text style={styles.costValue}>{formatCurrency(subtotal)}</Text>
-          </View>
-          
-          <View style={styles.costRow}>
-            <Text style={styles.costLabel}>Tax ({taxRate}%):</Text>
-            <Text style={styles.costValue}>{formatCurrency(taxAmount)}</Text>
-          </View>
-          
-          <View style={styles.costDivider} />
-          
-          <View style={styles.costRow}>
-            <Text style={styles.costLabelTotal}>Total:</Text>
-            <Text style={styles.costValueTotal}>{formatCurrency(totalWithTax)}</Text>
-          </View>
-        </View>
+        )}
 
         {/* Dates */}
         <View style={styles.section}>

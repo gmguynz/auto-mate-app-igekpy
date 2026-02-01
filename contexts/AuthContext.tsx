@@ -7,7 +7,7 @@ interface UserProfile {
   id: string;
   email: string;
   full_name: string | null;
-  role: 'admin' | 'user';
+  role: 'admin' | 'user' | 'technician';
   created_at: string;
   updated_at: string;
 }
@@ -18,6 +18,7 @@ interface AuthContextType {
   session: Session | null;
   loading: boolean;
   isAdmin: boolean;
+  isTechnician: boolean;
   signIn: (email: string, password: string) => Promise<{ error: any }>;
   signOut: () => Promise<void>;
   refreshProfile: () => Promise<void>;
@@ -188,6 +189,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return false;
   }, [profile, session]);
 
+  // Check technician status
+  const isTechnician = React.useMemo(() => {
+    // First check the profile
+    if (profile?.role === 'technician') {
+      console.log('User is technician (from profile)');
+      return true;
+    }
+    
+    // Also check JWT metadata as a fallback
+    if (session?.user) {
+      const jwtRole = session.user.app_metadata?.role || session.user.user_metadata?.role;
+      if (jwtRole === 'technician') {
+        console.log('User is technician (from JWT metadata)');
+        return true;
+      }
+    }
+    
+    return false;
+  }, [profile, session]);
+
   return (
     <AuthContext.Provider
       value={{
@@ -196,6 +217,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         session,
         loading,
         isAdmin,
+        isTechnician,
         signIn,
         signOut,
         refreshProfile,

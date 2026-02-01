@@ -20,6 +20,7 @@ import { jobCardStorage } from '@/utils/jobCardStorage';
 import { Customer, Vehicle } from '@/types/customer';
 import { JobCard, JobCardPart, JobCardLabour, Part } from '@/types/jobCard';
 import DateTimePicker from '@react-native-community/datetimepicker';
+import { useAuth } from '@/contexts/AuthContext';
 
 export default function AddJobCardScreen() {
   const router = useRouter();
@@ -27,6 +28,7 @@ export default function AddJobCardScreen() {
   const jobCardId = params.id as string | undefined;
   const preselectedCustomerId = params.customerId as string | undefined;
   const preselectedVehicleId = params.vehicleId as string | undefined;
+  const { isAdmin } = useAuth();
 
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -602,19 +604,23 @@ export default function AddJobCardScreen() {
                       keyboardType="decimal-pad"
                     />
                   </View>
-                  <View style={styles.itemField}>
-                    <Text style={styles.itemLabel}>Price</Text>
-                    <TextInput
-                      style={styles.itemInput}
-                      value={priceDisplay}
-                      onChangeText={(text) => updatePartUsed(index, 'pricePerUnit', text)}
-                      keyboardType="decimal-pad"
-                    />
-                  </View>
-                  <View style={styles.itemField}>
-                    <Text style={styles.itemLabel}>Total</Text>
-                    <Text style={styles.itemTotal}>{partTotal}</Text>
-                  </View>
+                  {isAdmin && (
+                    <React.Fragment>
+                      <View style={styles.itemField}>
+                        <Text style={styles.itemLabel}>Price</Text>
+                        <TextInput
+                          style={styles.itemInput}
+                          value={priceDisplay}
+                          onChangeText={(text) => updatePartUsed(index, 'pricePerUnit', text)}
+                          keyboardType="decimal-pad"
+                        />
+                      </View>
+                      <View style={styles.itemField}>
+                        <Text style={styles.itemLabel}>Total</Text>
+                        <Text style={styles.itemTotal}>{partTotal}</Text>
+                      </View>
+                    </React.Fragment>
+                  )}
                 </View>
               </View>
             );
@@ -639,7 +645,7 @@ export default function AddJobCardScreen() {
             </TouchableOpacity>
           </View>
 
-          {defaultHourlyRate > 0 && (
+          {isAdmin && defaultHourlyRate > 0 && (
             <View style={styles.infoBox}>
               <IconSymbol
                 ios_icon_name="info.circle.fill"
@@ -689,58 +695,64 @@ export default function AddJobCardScreen() {
                       keyboardType="decimal-pad"
                     />
                   </View>
-                  <View style={styles.itemField}>
-                    <Text style={styles.itemLabel}>Rate/Hr</Text>
-                    <TextInput
-                      style={styles.itemInput}
-                      value={rateDisplay}
-                      onChangeText={(text) => updateLabourEntry(index, 'ratePerHour', text)}
-                      keyboardType="decimal-pad"
-                    />
-                  </View>
-                  <View style={styles.itemField}>
-                    <Text style={styles.itemLabel}>Total</Text>
-                    <Text style={styles.itemTotal}>{labourTotal}</Text>
-                  </View>
+                  {isAdmin && (
+                    <React.Fragment>
+                      <View style={styles.itemField}>
+                        <Text style={styles.itemLabel}>Rate/Hr</Text>
+                        <TextInput
+                          style={styles.itemInput}
+                          value={rateDisplay}
+                          onChangeText={(text) => updateLabourEntry(index, 'ratePerHour', text)}
+                          keyboardType="decimal-pad"
+                        />
+                      </View>
+                      <View style={styles.itemField}>
+                        <Text style={styles.itemLabel}>Total</Text>
+                        <Text style={styles.itemTotal}>{labourTotal}</Text>
+                      </View>
+                    </React.Fragment>
+                  )}
                 </View>
               </View>
             );
           })}
         </View>
 
-        {/* Cost Breakdown */}
-        <View style={styles.costBreakdownSection}>
-          <Text style={styles.costBreakdownTitle}>Cost Breakdown</Text>
-          
-          <View style={styles.costRow}>
-            <Text style={styles.costLabel}>Parts:</Text>
-            <Text style={styles.costValue}>{formatCurrency(costBreakdown.partsCost)}</Text>
+        {/* Cost Breakdown - Admin Only */}
+        {isAdmin && (
+          <View style={styles.costBreakdownSection}>
+            <Text style={styles.costBreakdownTitle}>Cost Breakdown</Text>
+            
+            <View style={styles.costRow}>
+              <Text style={styles.costLabel}>Parts:</Text>
+              <Text style={styles.costValue}>{formatCurrency(costBreakdown.partsCost)}</Text>
+            </View>
+            
+            <View style={styles.costRow}>
+              <Text style={styles.costLabel}>Labour:</Text>
+              <Text style={styles.costValue}>{formatCurrency(costBreakdown.labourCost)}</Text>
+            </View>
+            
+            <View style={styles.costDivider} />
+            
+            <View style={styles.costRow}>
+              <Text style={styles.costLabel}>Subtotal:</Text>
+              <Text style={styles.costValue}>{formatCurrency(costBreakdown.subtotal)}</Text>
+            </View>
+            
+            <View style={styles.costRow}>
+              <Text style={styles.costLabel}>Tax ({defaultTaxRate}%):</Text>
+              <Text style={styles.costValue}>{formatCurrency(costBreakdown.taxAmount)}</Text>
+            </View>
+            
+            <View style={styles.costDivider} />
+            
+            <View style={styles.costRow}>
+              <Text style={styles.costLabelTotal}>Total:</Text>
+              <Text style={styles.costValueTotal}>{formatCurrency(costBreakdown.totalWithTax)}</Text>
+            </View>
           </View>
-          
-          <View style={styles.costRow}>
-            <Text style={styles.costLabel}>Labour:</Text>
-            <Text style={styles.costValue}>{formatCurrency(costBreakdown.labourCost)}</Text>
-          </View>
-          
-          <View style={styles.costDivider} />
-          
-          <View style={styles.costRow}>
-            <Text style={styles.costLabel}>Subtotal:</Text>
-            <Text style={styles.costValue}>{formatCurrency(costBreakdown.subtotal)}</Text>
-          </View>
-          
-          <View style={styles.costRow}>
-            <Text style={styles.costLabel}>Tax ({defaultTaxRate}%):</Text>
-            <Text style={styles.costValue}>{formatCurrency(costBreakdown.taxAmount)}</Text>
-          </View>
-          
-          <View style={styles.costDivider} />
-          
-          <View style={styles.costRow}>
-            <Text style={styles.costLabelTotal}>Total:</Text>
-            <Text style={styles.costValueTotal}>{formatCurrency(costBreakdown.totalWithTax)}</Text>
-          </View>
-        </View>
+        )}
 
         {/* Save Button */}
         <TouchableOpacity
@@ -907,7 +919,7 @@ export default function AddJobCardScreen() {
             <ScrollView style={styles.modalList}>
               {getFilteredParts().map((part, index) => {
                 const partSubtext = part.sku ? `SKU: ${part.sku} • Stock: ${part.stockQuantity}` : `Stock: ${part.stockQuantity}`;
-                const partPriceDisplay = formatCurrency(part.sellPrice);
+                const partPriceDisplay = isAdmin ? formatCurrency(part.sellPrice) : '';
                 
                 return (
                   <TouchableOpacity
@@ -921,7 +933,7 @@ export default function AddJobCardScreen() {
                         <Text style={styles.modalItemText}>{part.name}</Text>
                         <Text style={styles.modalItemSubtext}>{partSubtext}</Text>
                       </View>
-                      <Text style={styles.partPrice}>{partPriceDisplay}</Text>
+                      {isAdmin && <Text style={styles.partPrice}>{partPriceDisplay}</Text>}
                     </View>
                   </TouchableOpacity>
                 );
