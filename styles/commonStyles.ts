@@ -1,18 +1,56 @@
 
 import { StyleSheet, ViewStyle, TextStyle } from 'react-native';
 
+// Modern, sharp color scheme prioritizing efficiency and readability
 export const colors = {
-  background: '#f9f9f9',
-  text: '#212121',
-  textSecondary: '#757575',
-  primary: '#2962ff',
-  secondary: '#00bcd4',
-  accent: '#ff4081',
-  card: '#ffffff',
-  highlight: '#ffe082',
-  border: '#e0e0e0',
-  error: '#f44336',
-  success: '#4caf50',
+  // Primary brand colors - Sharp blue for professionalism
+  primary: '#0066FF',
+  primaryDark: '#0052CC',
+  primaryLight: '#3385FF',
+  
+  // Secondary colors - Vibrant accent
+  secondary: '#00C9A7',
+  secondaryDark: '#00A88A',
+  
+  // Status colors
+  success: '#00C853',
+  warning: '#FFB300',
+  error: '#FF3D00',
+  info: '#00B0FF',
+  
+  // Job card status colors
+  statusOpen: '#FF9800',
+  statusInProgress: '#2196F3',
+  statusCompleted: '#4CAF50',
+  statusCancelled: '#9E9E9E',
+  
+  // Neutral colors - Clean and modern
+  background: '#F5F7FA',
+  backgroundDark: '#E8ECF1',
+  card: '#FFFFFF',
+  cardHover: '#FAFBFC',
+  
+  // Text colors
+  text: '#1A1A1A',
+  textSecondary: '#6B7280',
+  textTertiary: '#9CA3AF',
+  textInverse: '#FFFFFF',
+  
+  // Border and divider colors
+  border: '#E5E7EB',
+  borderDark: '#D1D5DB',
+  divider: '#F3F4F6',
+  
+  // Accent and highlight
+  accent: '#FF6B35',
+  highlight: '#FFF4E6',
+  highlightBlue: '#E3F2FD',
+  highlightGreen: '#E8F5E9',
+  highlightRed: '#FFEBEE',
+  
+  // Overlay
+  overlay: 'rgba(0, 0, 0, 0.5)',
+  overlayLight: 'rgba(0, 0, 0, 0.3)',
 };
 
 export const buttonStyles = StyleSheet.create({
@@ -80,12 +118,12 @@ export const commonStyles = StyleSheet.create({
     backgroundColor: colors.card,
     borderColor: colors.border,
     borderWidth: 1,
-    borderRadius: 10,
-    padding: 10,
+    borderRadius: 12,
+    padding: 16,
     marginVertical: 8,
     width: '100%',
-    boxShadow: '0px 2px 3px rgba(0, 0, 0, 0.1)',
-    elevation: 2,
+    boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.08)',
+    elevation: 3,
   },
   icon: {
     width: 60,

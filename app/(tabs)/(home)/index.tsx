@@ -1,33 +1,32 @@
 
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, TextInput } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, RefreshControl, Platform } from 'react-native';
 import { useRouter } from 'expo-router';
 import { colors } from '@/styles/commonStyles';
 import { IconSymbol } from '@/components/IconSymbol';
-import { AppFooter } from '@/components/AppFooter';
 import { storageUtils } from '@/utils/storage';
-import { SupabaseSetupGuide } from '@/components/SupabaseSetupGuide';
-import { dateUtils } from '@/utils/dateUtils';
 import { Customer } from '@/types/customer';
 import { useAuth } from '@/contexts/AuthContext';
 import { jobCardStorage } from '@/utils/jobCardStorage';
 import { JobCard } from '@/types/jobCard';
+import { dateUtils } from '@/utils/dateUtils';
 
 export default function HomeScreen() {
   const router = useRouter();
   const { user, profile, isAdmin } = useAuth();
-  const [showSetupGuide, setShowSetupGuide] = useState(false);
-  const [isSupabaseConfigured, setIsSupabaseConfigured] = useState(false);
   const [customerCount, setCustomerCount] = useState(0);
   const [vehicleCount, setVehicleCount] = useState(0);
   const [reminderCount, setReminderCount] = useState(0);
   const [activeJobCardsCount, setActiveJobCardsCount] = useState(0);
+  const [openJobsCount, setOpenJobsCount] = useState(0);
+  const [inProgressJobsCount, setInProgressJobsCount] = useState(0);
+  const [completedTodayCount, setCompletedTodayCount] = useState(0);
   const [activeJobCardsTotal, setActiveJobCardsTotal] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [customers, setCustomers] = useState<Customer[]>([]);
-  const [isAboutExpanded, setIsAboutExpanded] = useState(false);
+  const [recentJobCards, setRecentJobCards] = useState<JobCard[]>([]);
 
   useEffect(() => {
     initializeScreen();
@@ -36,29 +35,14 @@ export default function HomeScreen() {
   const initializeScreen = async () => {
     try {
       setIsLoading(true);
-      setError(null);
-      
-      console.log('Initializing home screen...');
-      await checkSupabaseConfig();
+      console.log('Initializing dashboard...');
       await loadCounts();
-      
-      console.log('Home screen initialized successfully');
+      console.log('Dashboard initialized successfully');
     } catch (err) {
-      console.error('Error initializing home screen:', err);
-      setError(err instanceof Error ? err.message : 'Failed to load data');
+      console.error('Error initializing dashboard:', err);
     } finally {
       setIsLoading(false);
-    }
-  };
-
-  const checkSupabaseConfig = async () => {
-    try {
-      const configured = storageUtils.shouldUseSupabase();
-      setIsSupabaseConfigured(configured);
-      console.log('Supabase configured:', configured);
-    } catch (err) {
-      console.error('Error checking Supabase config:', err);
-      setIsSupabaseConfigured(false);
+      setRefreshing(false);
     }
   };
 
@@ -77,22 +61,39 @@ export default function HomeScreen() {
       const reminders = getUpcomingReminders(customersData);
       setReminderCount(reminders);
 
-      // Load active job cards
       const jobCards = await jobCardStorage.getJobCards();
       const activeJobCards = jobCards.filter(jc => jc.status === 'open' || jc.status === 'in_progress');
+      const openJobs = jobCards.filter(jc => jc.status === 'open');
+      const inProgressJobs = jobCards.filter(jc => jc.status === 'in_progress');
+      
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const completedToday = jobCards.filter(jc => {
+        if (jc.status === 'completed' && jc.completedAt) {
+          const completedDate = new Date(jc.completedAt);
+          completedDate.setHours(0, 0, 0, 0);
+          return completedDate.getTime() === today.getTime();
+        }
+        return false;
+      });
+      
       setActiveJobCardsCount(activeJobCards.length);
+      setOpenJobsCount(openJobs.length);
+      setInProgressJobsCount(inProgressJobs.length);
+      setCompletedTodayCount(completedToday.length);
       
       const totalValue = activeJobCards.reduce((sum, jc) => sum + jc.totalCost, 0);
       setActiveJobCardsTotal(totalValue);
       
+      const sortedJobCards = jobCards
+        .filter(jc => jc.status === 'open' || jc.status === 'in_progress')
+        .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
+        .slice(0, 5);
+      setRecentJobCards(sortedJobCards);
+      
       console.log(`Loaded ${customersData.length} customers, ${totalVehicles} vehicles, ${reminders} reminders, ${activeJobCards.length} active job cards`);
     } catch (err) {
       console.error('Error loading counts:', err);
-      setCustomerCount(0);
-      setVehicleCount(0);
-      setReminderCount(0);
-      setActiveJobCardsCount(0);
-      setActiveJobCardsTotal(0);
     }
   };
 
@@ -124,32 +125,6 @@ export default function HomeScreen() {
     return count;
   };
 
-  const handleMigrateData = async () => {
-    Alert.alert(
-      'Migrate to Supabase',
-      'This will move all your local customer data to Supabase cloud storage. Make sure you have set up your Supabase project first.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Migrate',
-          onPress: async () => {
-            try {
-              const result = await storageUtils.migrateToSupabase();
-              Alert.alert(
-                result.success ? 'Success' : 'Error',
-                result.message,
-                [{ text: 'OK', onPress: () => initializeScreen() }]
-              );
-            } catch (err) {
-              console.error('Migration error:', err);
-              Alert.alert('Error', 'Failed to migrate data');
-            }
-          },
-        },
-      ]
-    );
-  };
-
   const handleSearch = () => {
     if (searchQuery.trim()) {
       router.push(`/customers?search=${encodeURIComponent(searchQuery.trim())}`);
@@ -174,35 +149,36 @@ export default function HomeScreen() {
     return `$${amount.toFixed(2)}`;
   };
 
+  const getStatusColor = (status: string) => {
+    const statusColorMap = {
+      open: colors.statusOpen,
+      in_progress: colors.statusInProgress,
+      completed: colors.statusCompleted,
+      cancelled: colors.statusCancelled,
+    };
+    const statusKey = status as keyof typeof statusColorMap;
+    return statusColorMap[statusKey] || colors.textSecondary;
+  };
+
+  const getStatusLabel = (status: string) => {
+    const statusLabelMap = {
+      open: 'Open',
+      in_progress: 'In Progress',
+      completed: 'Completed',
+      cancelled: 'Cancelled',
+    };
+    const statusKey = status as keyof typeof statusLabelMap;
+    return statusLabelMap[statusKey] || status;
+  };
+
+  const onRefresh = () => {
+    setRefreshing(true);
+    initializeScreen();
+  };
+
   const filteredCustomers = getFilteredCustomers();
-
-  if (showSetupGuide) {
-    return <SupabaseSetupGuide onDismiss={() => setShowSetupGuide(false)} />;
-  }
-
-  if (isLoading) {
-    return (
-      <View style={styles.container}>
-        <View style={styles.loadingContainer}>
-          <Text style={styles.loadingText}>Loading...</Text>
-        </View>
-      </View>
-    );
-  }
-
-  if (error) {
-    return (
-      <View style={styles.container}>
-        <View style={styles.errorContainer}>
-          <Text style={styles.errorTitle}>Error Loading Data</Text>
-          <Text style={styles.errorMessage}>{error}</Text>
-          <TouchableOpacity style={styles.retryButton} onPress={initializeScreen}>
-            <Text style={styles.retryButtonText}>Retry</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-    );
-  }
+  const userName = profile?.full_name || user?.email?.split('@')[0] || 'User';
+  const greeting = `Welcome back, ${userName}`;
 
   return (
     <View style={styles.container}>
@@ -210,28 +186,26 @@ export default function HomeScreen() {
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}
       >
         <View style={styles.header}>
-          <Text style={styles.title}>Charlies Workshop</Text>
-          <Text style={styles.subtitle}>Customer & Vehicle Management</Text>
-          {user && (
-            <View style={styles.userBadge}>
-              <IconSymbol
-                ios_icon_name="person.fill"
-                android_material_icon_name="person"
-                size={16}
-                color={colors.primary}
-              />
-              <Text style={styles.userBadgeText}>
-                {profile?.full_name || user.email}
-              </Text>
-              {isAdmin && (
-                <View style={styles.adminBadge}>
-                  <Text style={styles.adminBadgeText}>ADMIN</Text>
-                </View>
-              )}
+          <View style={styles.headerTop}>
+            <View>
+              <Text style={styles.greeting}>{greeting}</Text>
+              <Text style={styles.subtitle}>Charlie&apos;s Workshop Dashboard</Text>
             </View>
-          )}
+            {isAdmin && (
+              <View style={styles.adminBadge}>
+                <IconSymbol
+                  ios_icon_name="shield.fill"
+                  android_material_icon_name="admin-panel-settings"
+                  size={16}
+                  color={colors.primary}
+                />
+                <Text style={styles.adminBadgeText}>ADMIN</Text>
+              </View>
+            )}
+          </View>
         </View>
 
         <View style={styles.searchContainer}>
@@ -244,7 +218,7 @@ export default function HomeScreen() {
           />
           <TextInput
             style={styles.searchInput}
-            placeholder="Search by name, company, or rego..."
+            placeholder="Quick search customers or vehicles..."
             placeholderTextColor={colors.textSecondary}
             value={searchQuery}
             onChangeText={setSearchQuery}
@@ -265,9 +239,6 @@ export default function HomeScreen() {
 
         {searchQuery.trim() && filteredCustomers.length > 0 && (
           <View style={styles.searchResults}>
-            <Text style={styles.searchResultsTitle}>
-              {filteredCustomers.length} result{filteredCustomers.length !== 1 ? 's' : ''}
-            </Text>
             {filteredCustomers.slice(0, 3).map((customer, index) => {
               const displayName = customer.companyName || `${customer.firstName} ${customer.lastName}`;
               const vehicleCountText = customer.vehicles.length === 1 ? '1 vehicle' : `${customer.vehicles.length} vehicles`;
@@ -282,10 +253,7 @@ export default function HomeScreen() {
                   >
                     <View style={styles.searchResultInfo}>
                       <Text style={styles.searchResultName}>{displayName}</Text>
-                      <Text style={styles.searchResultDetail}>{customer.email}</Text>
-                      {customer.vehicles.length > 0 && (
-                        <Text style={styles.searchResultDetail}>{vehicleCountText}</Text>
-                      )}
+                      <Text style={styles.searchResultDetail}>{vehicleCountText}</Text>
                     </View>
                     <IconSymbol
                       ios_icon_name="chevron.right"
@@ -297,357 +265,246 @@ export default function HomeScreen() {
                 </React.Fragment>
               );
             })}
-            {filteredCustomers.length > 3 && (
-              <TouchableOpacity
-                style={styles.viewAllButton}
-                onPress={handleSearch}
-              >
-                <Text style={styles.viewAllButtonText}>
-                  View all {filteredCustomers.length} results
-                </Text>
-              </TouchableOpacity>
-            )}
           </View>
         )}
 
-        <View style={styles.actionsContainer}>
-          <Text style={styles.actionsTitle}>Quick Actions</Text>
-
-          <TouchableOpacity
-            style={styles.actionCard}
-            onPress={() => router.push('/customers')}
-          >
-            <View style={styles.actionIcon}>
-              <IconSymbol
-                ios_icon_name="person.crop.circle"
-                android_material_icon_name="person"
-                size={24}
-                color={colors.primary}
-              />
-            </View>
-            <View style={styles.actionContent}>
-              <Text style={styles.actionTitle}>View Customers</Text>
-              <Text style={styles.actionDescription}>Browse and manage your customer database</Text>
-            </View>
-            <IconSymbol
-              ios_icon_name="chevron.right"
-              android_material_icon_name="chevron-right"
-              size={20}
-              color={colors.textSecondary}
-            />
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.actionCard}
-            onPress={() => router.push('/customers/add')}
-          >
-            <View style={styles.actionIcon}>
-              <IconSymbol
-                ios_icon_name="plus.circle.fill"
-                android_material_icon_name="add-circle"
-                size={24}
-                color={colors.primary}
-              />
-            </View>
-            <View style={styles.actionContent}>
-              <Text style={styles.actionTitle}>Add New Customer</Text>
-              <Text style={styles.actionDescription}>Create a new customer record with vehicle details</Text>
-            </View>
-            <IconSymbol
-              ios_icon_name="chevron.right"
-              android_material_icon_name="chevron-right"
-              size={20}
-              color={colors.textSecondary}
-            />
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.actionCard}
-            onPress={() => router.push('/customers/add-job-card')}
-          >
-            <View style={styles.actionIcon}>
-              <IconSymbol
-                ios_icon_name="doc.text.fill"
-                android_material_icon_name="description"
-                size={24}
-                color={colors.success}
-              />
-            </View>
-            <View style={styles.actionContent}>
-              <Text style={styles.actionTitle}>Create Job Card</Text>
-              <Text style={styles.actionDescription}>Start a new job card for a customer vehicle</Text>
-            </View>
-            <IconSymbol
-              ios_icon_name="chevron.right"
-              android_material_icon_name="chevron-right"
-              size={20}
-              color={colors.textSecondary}
-            />
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.actionCard}
-            onPress={() => router.push('/customers/job-cards')}
-          >
-            <View style={styles.actionIcon}>
-              <IconSymbol
-                ios_icon_name="list.bullet.clipboard"
-                android_material_icon_name="assignment"
-                size={24}
-                color={colors.accent}
-              />
-            </View>
-            <View style={styles.actionContent}>
-              <Text style={styles.actionTitle}>View Job Cards</Text>
-              <Text style={styles.actionDescription}>Browse all job cards and their status</Text>
-            </View>
-            <IconSymbol
-              ios_icon_name="chevron.right"
-              android_material_icon_name="chevron-right"
-              size={20}
-              color={colors.textSecondary}
-            />
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.actionCard}
-            onPress={() => router.push('/customers/parts')}
-          >
-            <View style={styles.actionIcon}>
-              <IconSymbol
-                ios_icon_name="wrench.and.screwdriver.fill"
-                android_material_icon_name="build"
-                size={24}
-                color="#FF9800"
-              />
-            </View>
-            <View style={styles.actionContent}>
-              <Text style={styles.actionTitle}>Parts Management</Text>
-              <Text style={styles.actionDescription}>Manage inventory and stock parts</Text>
-            </View>
-            <IconSymbol
-              ios_icon_name="chevron.right"
-              android_material_icon_name="chevron-right"
-              size={20}
-              color={colors.textSecondary}
-            />
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.actionCard}
-            onPress={() => router.push('/customers/vehicles')}
-          >
-            <View style={styles.actionIcon}>
-              <IconSymbol
-                ios_icon_name="car.fill"
-                android_material_icon_name="directions-car"
-                size={24}
-                color={colors.primary}
-              />
-            </View>
-            <View style={styles.actionContent}>
-              <Text style={styles.actionTitle}>Vehicle Database</Text>
-              <Text style={styles.actionDescription}>Search vehicles by registration number</Text>
-            </View>
-            <IconSymbol
-              ios_icon_name="chevron.right"
-              android_material_icon_name="chevron-right"
-              size={20}
-              color={colors.textSecondary}
-            />
-          </TouchableOpacity>
-
-          {!isSupabaseConfigured && customerCount > 0 && (
+        <View style={styles.quickActionsSection}>
+          <Text style={styles.sectionTitle}>Quick Actions</Text>
+          <View style={styles.quickActionsGrid}>
             <TouchableOpacity
-              style={[styles.actionCard, styles.migrateCard]}
-              onPress={handleMigrateData}
+              style={[styles.quickActionCard, styles.quickActionPrimary]}
+              onPress={() => router.push('/customers/add-job-card')}
+              activeOpacity={0.7}
             >
-              <View style={styles.actionIcon}>
+              <View style={styles.quickActionIcon}>
                 <IconSymbol
-                  ios_icon_name="arrow.up.doc.fill"
-                  android_material_icon_name="cloud-upload"
-                  size={24}
-                  color={colors.accent}
+                  ios_icon_name="plus.circle.fill"
+                  android_material_icon_name="add-circle"
+                  size={32}
+                  color={colors.primary}
                 />
               </View>
-              <View style={styles.actionContent}>
-                <Text style={styles.actionTitle}>Migrate to Cloud</Text>
-                <Text style={styles.actionDescription}>
-                  Move your {customerCount} customer{customerCount !== 1 ? 's' : ''} to Supabase cloud storage
-                </Text>
-              </View>
-              <IconSymbol
-                ios_icon_name="chevron.right"
-                android_material_icon_name="chevron-right"
-                size={20}
-                color={colors.textSecondary}
-              />
+              <Text style={styles.quickActionTitle}>New Job Card</Text>
+              <Text style={styles.quickActionSubtitle}>Start a new job</Text>
             </TouchableOpacity>
-          )}
-        </View>
 
-        <View style={styles.statsContainer}>
-          <TouchableOpacity
-            style={styles.statCard}
-            onPress={() => router.push('/customers')}
-            activeOpacity={0.7}
-          >
-            <IconSymbol
-              ios_icon_name="person.3.fill"
-              android_material_icon_name="people"
-              size={28}
-              color={colors.primary}
-            />
-            <Text style={styles.statNumber}>{customerCount}</Text>
-            <Text style={styles.statLabel}>Customers</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.statCard}
-            onPress={() => router.push('/customers/vehicles')}
-            activeOpacity={0.7}
-          >
-            <IconSymbol
-              ios_icon_name="car.fill"
-              android_material_icon_name="directions-car"
-              size={28}
-              color={colors.success}
-            />
-            <Text style={styles.statNumber}>{vehicleCount}</Text>
-            <Text style={styles.statLabel}>Vehicles</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.statCard}
-            onPress={() => router.push('/customers/reminders')}
-            activeOpacity={0.7}
-          >
-            <IconSymbol
-              ios_icon_name="bell.fill"
-              android_material_icon_name="notifications"
-              size={28}
-              color={colors.accent}
-            />
-            <Text style={styles.statNumber}>{reminderCount}</Text>
-            <Text style={styles.statLabel}>Reminders</Text>
-            <Text style={styles.statSubLabel}>(14 days)</Text>
-          </TouchableOpacity>
-        </View>
-
-        <View style={styles.statsContainer}>
-          <TouchableOpacity
-            style={[styles.statCard, styles.jobCardStatCard]}
-            onPress={() => router.push('/customers/job-cards')}
-            activeOpacity={0.7}
-          >
-            <IconSymbol
-              ios_icon_name="doc.text.fill"
-              android_material_icon_name="description"
-              size={28}
-              color="#FF9800"
-            />
-            <Text style={styles.statNumber}>{activeJobCardsCount}</Text>
-            <Text style={styles.statLabel}>Active Jobs</Text>
-            <Text style={styles.statValue}>{formatCurrency(activeJobCardsTotal)}</Text>
-          </TouchableOpacity>
-        </View>
-
-        <TouchableOpacity
-          style={styles.infoSection}
-          onPress={() => setIsAboutExpanded(!isAboutExpanded)}
-          activeOpacity={0.7}
-        >
-          <View style={styles.infoHeader}>
-            <Text style={styles.infoTitle}>About This App</Text>
-            <IconSymbol
-              ios_icon_name={isAboutExpanded ? "chevron.up" : "chevron.down"}
-              android_material_icon_name={isAboutExpanded ? "expand-less" : "expand-more"}
-              size={24}
-              color={colors.text}
-            />
-          </View>
-          {isAboutExpanded && (
-            <View style={styles.infoContent}>
-              <Text style={styles.infoText}>
-                This customer database app helps mechanics manage customer information, vehicle details, and service reminders.
-                {'\n\n'}
-                Features include:
-              </Text>
-              <View style={styles.featureList}>
-                <View style={styles.featureItem}>
-                  <Text style={styles.featureBullet}>•</Text>
-                  <Text style={styles.featureText}>Secure user authentication and access control</Text>
-                </View>
-                <View style={styles.featureItem}>
-                  <Text style={styles.featureBullet}>•</Text>
-                  <Text style={styles.featureText}>Store customer and vehicle information</Text>
-                </View>
-                <View style={styles.featureItem}>
-                  <Text style={styles.featureBullet}>•</Text>
-                  <Text style={styles.featureText}>Track WOF inspection and service due dates</Text>
-                </View>
-                <View style={styles.featureItem}>
-                  <Text style={styles.featureBullet}>•</Text>
-                  <Text style={styles.featureText}>Automated reminders 14 days before due dates</Text>
-                </View>
-                <View style={styles.featureItem}>
-                  <Text style={styles.featureBullet}>•</Text>
-                  <Text style={styles.featureText}>Search by name, company, or vehicle registration</Text>
-                </View>
-                <View style={styles.featureItem}>
-                  <Text style={styles.featureBullet}>•</Text>
-                  <Text style={styles.featureText}>Cloud storage with Supabase</Text>
-                </View>
+            <TouchableOpacity
+              style={styles.quickActionCard}
+              onPress={() => router.push('/customers/job-cards')}
+              activeOpacity={0.7}
+            >
+              <View style={styles.quickActionIcon}>
+                <IconSymbol
+                  ios_icon_name="list.bullet.clipboard"
+                  android_material_icon_name="assignment"
+                  size={32}
+                  color={colors.statusInProgress}
+                />
               </View>
-            </View>
-          )}
-        </TouchableOpacity>
+              <Text style={styles.quickActionTitle}>View All Jobs</Text>
+              <Text style={styles.quickActionSubtitle}>Browse job cards</Text>
+            </TouchableOpacity>
 
-        {isSupabaseConfigured && (
-          <View style={styles.successCard}>
-            <IconSymbol
-              ios_icon_name="checkmark.shield.fill"
-              android_material_icon_name="verified-user"
-              size={32}
-              color="#4CAF50"
-            />
-            <View style={styles.successContent}>
-              <Text style={styles.successTitle}>Secure & Protected</Text>
-              <Text style={styles.successText}>
-                Your data is securely stored in Supabase with user authentication enabled. 
-                Only authorized users can access the database. Automated email reminders are sent 14 days before due dates via Resend.
-              </Text>
+            <TouchableOpacity
+              style={styles.quickActionCard}
+              onPress={() => router.push('/customers/add')}
+              activeOpacity={0.7}
+            >
+              <View style={styles.quickActionIcon}>
+                <IconSymbol
+                  ios_icon_name="person.crop.circle.badge.plus"
+                  android_material_icon_name="person-add"
+                  size={32}
+                  color={colors.secondary}
+                />
+              </View>
+              <Text style={styles.quickActionTitle}>Add Customer</Text>
+              <Text style={styles.quickActionSubtitle}>New customer</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.quickActionCard}
+              onPress={() => router.push('/customers/parts')}
+              activeOpacity={0.7}
+            >
+              <View style={styles.quickActionIcon}>
+                <IconSymbol
+                  ios_icon_name="wrench.and.screwdriver.fill"
+                  android_material_icon_name="build"
+                  size={32}
+                  color={colors.warning}
+                />
+              </View>
+              <Text style={styles.quickActionTitle}>Parts</Text>
+              <Text style={styles.quickActionSubtitle}>Manage inventory</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        <View style={styles.statsSection}>
+          <Text style={styles.sectionTitle}>Job Cards Overview</Text>
+          <View style={styles.statsGrid}>
+            <TouchableOpacity
+              style={[styles.statCard, styles.statCardOpen]}
+              onPress={() => router.push('/customers/job-cards')}
+              activeOpacity={0.7}
+            >
+              <View style={styles.statHeader}>
+                <IconSymbol
+                  ios_icon_name="doc.text"
+                  android_material_icon_name="description"
+                  size={24}
+                  color={colors.statusOpen}
+                />
+                <Text style={styles.statNumber}>{openJobsCount}</Text>
+              </View>
+              <Text style={styles.statLabel}>Open Jobs</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.statCard, styles.statCardInProgress]}
+              onPress={() => router.push('/customers/job-cards')}
+              activeOpacity={0.7}
+            >
+              <View style={styles.statHeader}>
+                <IconSymbol
+                  ios_icon_name="hammer.fill"
+                  android_material_icon_name="build"
+                  size={24}
+                  color={colors.statusInProgress}
+                />
+                <Text style={styles.statNumber}>{inProgressJobsCount}</Text>
+              </View>
+              <Text style={styles.statLabel}>In Progress</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.statCard, styles.statCardCompleted]}
+              onPress={() => router.push('/customers/job-cards')}
+              activeOpacity={0.7}
+            >
+              <View style={styles.statHeader}>
+                <IconSymbol
+                  ios_icon_name="checkmark.circle.fill"
+                  android_material_icon_name="check-circle"
+                  size={24}
+                  color={colors.statusCompleted}
+                />
+                <Text style={styles.statNumber}>{completedTodayCount}</Text>
+              </View>
+              <Text style={styles.statLabel}>Done Today</Text>
+            </TouchableOpacity>
+
+            <View style={[styles.statCard, styles.statCardTotal]}>
+              <View style={styles.statHeader}>
+                <IconSymbol
+                  ios_icon_name="dollarsign.circle.fill"
+                  android_material_icon_name="attach-money"
+                  size={24}
+                  color={colors.primary}
+                />
+                <Text style={styles.statValue}>{formatCurrency(activeJobCardsTotal)}</Text>
+              </View>
+              <Text style={styles.statLabel}>Active Value</Text>
             </View>
+          </View>
+        </View>
+
+        {recentJobCards.length > 0 && (
+          <View style={styles.recentJobsSection}>
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitle}>Recent Active Jobs</Text>
+              <TouchableOpacity onPress={() => router.push('/customers/job-cards')}>
+                <Text style={styles.sectionLink}>View All</Text>
+              </TouchableOpacity>
+            </View>
+            {recentJobCards.map((jobCard, index) => {
+              const statusColor = getStatusColor(jobCard.status);
+              const statusLabel = getStatusLabel(jobCard.status);
+              const updatedDate = dateUtils.formatDate(jobCard.updatedAt);
+              return (
+                <React.Fragment key={index}>
+                  <TouchableOpacity
+                    style={styles.jobCardPreview}
+                    onPress={() => router.push(`/customers/job-card-detail?id=${jobCard.id}`)}
+                    activeOpacity={0.7}
+                  >
+                    <View style={styles.jobCardPreviewHeader}>
+                      <Text style={styles.jobCardNumber}>{jobCard.jobNumber}</Text>
+                      <View style={[styles.jobCardStatus, { backgroundColor: statusColor }]}>
+                        <Text style={styles.jobCardStatusText}>{statusLabel}</Text>
+                      </View>
+                    </View>
+                    <Text style={styles.jobCardCustomer}>{jobCard.customerName}</Text>
+                    <Text style={styles.jobCardVehicle}>
+                      {jobCard.vehicleReg} - {jobCard.vehicleMake} {jobCard.vehicleModel}
+                    </Text>
+                    <View style={styles.jobCardFooter}>
+                      <Text style={styles.jobCardDate}>{updatedDate}</Text>
+                      <Text style={styles.jobCardTotal}>{formatCurrency(jobCard.totalCost)}</Text>
+                    </View>
+                  </TouchableOpacity>
+                </React.Fragment>
+              );
+            })}
           </View>
         )}
 
-        {!isSupabaseConfigured && (
-          <TouchableOpacity
-            style={styles.warningCard}
-            onPress={() => setShowSetupGuide(true)}
-          >
-            <IconSymbol
-              ios_icon_name="exclamationmark.triangle.fill"
-              android_material_icon_name="warning"
-              size={32}
-              color={colors.accent}
-            />
-            <View style={styles.warningContent}>
-              <Text style={styles.warningTitle}>Using Local Storage</Text>
-              <Text style={styles.warningText}>
-                Your data is stored locally on this device only. Tap here to set up cloud storage with Supabase for multi-device access and user authentication.
-              </Text>
-            </View>
-            <IconSymbol
-              ios_icon_name="chevron.right"
-              android_material_icon_name="chevron-right"
-              size={20}
-              color={colors.textSecondary}
-            />
-          </TouchableOpacity>
-        )}
+        <View style={styles.statsSection}>
+          <Text style={styles.sectionTitle}>Database Overview</Text>
+          <View style={styles.statsGrid}>
+            <TouchableOpacity
+              style={styles.statCard}
+              onPress={() => router.push('/customers')}
+              activeOpacity={0.7}
+            >
+              <View style={styles.statHeader}>
+                <IconSymbol
+                  ios_icon_name="person.3.fill"
+                  android_material_icon_name="people"
+                  size={24}
+                  color={colors.primary}
+                />
+                <Text style={styles.statNumber}>{customerCount}</Text>
+              </View>
+              <Text style={styles.statLabel}>Customers</Text>
+            </TouchableOpacity>
 
-        <AppFooter />
+            <TouchableOpacity
+              style={styles.statCard}
+              onPress={() => router.push('/customers/vehicles')}
+              activeOpacity={0.7}
+            >
+              <View style={styles.statHeader}>
+                <IconSymbol
+                  ios_icon_name="car.fill"
+                  android_material_icon_name="directions-car"
+                  size={24}
+                  color={colors.secondary}
+                />
+                <Text style={styles.statNumber}>{vehicleCount}</Text>
+              </View>
+              <Text style={styles.statLabel}>Vehicles</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.statCard}
+              onPress={() => router.push('/customers/reminders')}
+              activeOpacity={0.7}
+            >
+              <View style={styles.statHeader}>
+                <IconSymbol
+                  ios_icon_name="bell.fill"
+                  android_material_icon_name="notifications"
+                  size={24}
+                  color={colors.warning}
+                />
+                <Text style={styles.statNumber}>{reminderCount}</Text>
+              </View>
+              <Text style={styles.statLabel}>Reminders</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
       </ScrollView>
     </View>
   );
@@ -658,135 +515,91 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.background,
   },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  loadingText: {
-    fontSize: 18,
-    color: colors.text,
-  },
-  errorContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
-  },
-  errorTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: colors.text,
-    marginBottom: 12,
-    textAlign: 'center',
-  },
-  errorMessage: {
-    fontSize: 16,
-    color: colors.textSecondary,
-    marginBottom: 24,
-    textAlign: 'center',
-  },
-  retryButton: {
-    backgroundColor: colors.primary,
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    borderRadius: 8,
-  },
-  retryButtonText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '600',
-  },
   scrollView: {
     flex: 1,
   },
   scrollContent: {
-    padding: 20,
-    paddingTop: 60,
     paddingBottom: 100,
   },
   header: {
-    marginBottom: 16,
+    paddingTop: 60,
+    paddingHorizontal: 20,
+    paddingBottom: 20,
+    backgroundColor: colors.card,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
   },
-  title: {
-    fontSize: 32,
-    fontWeight: 'bold',
+  headerTop: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+  },
+  greeting: {
+    fontSize: 28,
+    fontWeight: '700',
     color: colors.text,
     marginBottom: 4,
   },
   subtitle: {
-    fontSize: 16,
+    fontSize: 15,
     color: colors.textSecondary,
-    marginBottom: 12,
-  },
-  userBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.highlight,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 16,
-    alignSelf: 'flex-start',
-    gap: 6,
-  },
-  userBadgeText: {
-    fontSize: 14,
-    color: colors.text,
     fontWeight: '500',
   },
   adminBadge: {
-    backgroundColor: colors.primary,
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 8,
-    marginLeft: 4,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: colors.highlightBlue,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: colors.primary,
   },
   adminBadgeText: {
-    fontSize: 10,
-    fontWeight: '600',
-    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '700',
+    color: colors.primary,
   },
   searchContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: colors.card,
-    marginBottom: 16,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
+    marginHorizontal: 20,
+    marginTop: 16,
+    marginBottom: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
     borderRadius: 12,
     borderWidth: 1,
     borderColor: colors.border,
+    boxShadow: '0px 2px 4px rgba(0, 0, 0, 0.04)',
+    elevation: 2,
   },
   searchIcon: {
-    marginRight: 8,
+    marginRight: 12,
   },
   searchInput: {
     flex: 1,
     fontSize: 16,
     color: colors.text,
+    cursor: Platform.OS === 'web' ? 'text' : undefined,
+    outlineStyle: Platform.OS === 'web' ? 'none' : undefined,
   },
   searchResults: {
-    backgroundColor: colors.card,
-    borderRadius: 12,
-    padding: 12,
+    marginHorizontal: 20,
     marginBottom: 16,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  searchResultsTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: colors.textSecondary,
-    marginBottom: 8,
   },
   searchResultCard: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    padding: 12,
-    backgroundColor: colors.background,
-    borderRadius: 8,
+    padding: 16,
+    backgroundColor: colors.card,
+    borderRadius: 12,
     marginBottom: 8,
+    borderWidth: 1,
+    borderColor: colors.border,
   },
   searchResultInfo: {
     flex: 1,
@@ -795,204 +608,190 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: colors.text,
-    marginBottom: 2,
+    marginBottom: 4,
   },
   searchResultDetail: {
-    fontSize: 13,
+    fontSize: 14,
     color: colors.textSecondary,
   },
-  viewAllButton: {
-    padding: 12,
-    alignItems: 'center',
+  quickActionsSection: {
+    paddingHorizontal: 20,
+    marginTop: 24,
   },
-  viewAllButtonText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: colors.primary,
-  },
-  actionsContainer: {
-    marginBottom: 24,
-  },
-  actionsTitle: {
+  sectionTitle: {
     fontSize: 20,
-    fontWeight: 'bold',
+    fontWeight: '700',
     color: colors.text,
-    marginBottom: 12,
+    marginBottom: 16,
   },
-  actionCard: {
+  quickActionsGrid: {
     flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.card,
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
-    borderWidth: 1,
-    borderColor: colors.border,
+    flexWrap: 'wrap',
     gap: 12,
   },
-  migrateCard: {
-    backgroundColor: '#FFF3E0',
-    borderColor: '#FFB74D',
-  },
-  actionIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: colors.highlight,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  actionContent: {
+  quickActionCard: {
     flex: 1,
-  },
-  actionTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: colors.text,
-    marginBottom: 2,
-  },
-  actionDescription: {
-    fontSize: 14,
-    color: colors.textSecondary,
-    lineHeight: 18,
-  },
-  statsContainer: {
-    flexDirection: 'row',
-    gap: 10,
-    marginBottom: 24,
-  },
-  statCard: {
-    flex: 1,
+    minWidth: '47%',
     backgroundColor: colors.card,
-    borderRadius: 12,
-    padding: 14,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  jobCardStatCard: {
-    backgroundColor: '#FFF3E0',
-    borderColor: '#FFB74D',
-  },
-  statNumber: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: colors.text,
-    marginTop: 6,
-  },
-  statLabel: {
-    fontSize: 12,
-    color: colors.textSecondary,
-    marginTop: 4,
-    textAlign: 'center',
-  },
-  statSubLabel: {
-    fontSize: 10,
-    color: colors.textSecondary,
-    marginTop: 2,
-    textAlign: 'center',
-  },
-  statValue: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#FF9800',
-    marginTop: 4,
-  },
-  infoSection: {
-    backgroundColor: colors.card,
-    borderRadius: 12,
+    borderRadius: 16,
     padding: 20,
     borderWidth: 1,
     borderColor: colors.border,
-    marginBottom: 16,
+    alignItems: 'center',
+    boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.06)',
+    elevation: 3,
   },
-  infoHeader: {
+  quickActionPrimary: {
+    backgroundColor: colors.highlightBlue,
+    borderColor: colors.primary,
+    borderWidth: 2,
+  },
+  quickActionIcon: {
+    marginBottom: 12,
+  },
+  quickActionTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: colors.text,
+    marginBottom: 4,
+    textAlign: 'center',
+  },
+  quickActionSubtitle: {
+    fontSize: 13,
+    color: colors.textSecondary,
+    textAlign: 'center',
+  },
+  statsSection: {
+    paddingHorizontal: 20,
+    marginTop: 32,
+  },
+  statsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+  },
+  statCard: {
+    flex: 1,
+    minWidth: '47%',
+    backgroundColor: colors.card,
+    borderRadius: 16,
+    padding: 20,
+    borderWidth: 1,
+    borderColor: colors.border,
+    boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.06)',
+    elevation: 3,
+  },
+  statCardOpen: {
+    backgroundColor: '#FFF8E1',
+    borderColor: colors.statusOpen,
+  },
+  statCardInProgress: {
+    backgroundColor: '#E3F2FD',
+    borderColor: colors.statusInProgress,
+  },
+  statCardCompleted: {
+    backgroundColor: '#E8F5E9',
+    borderColor: colors.statusCompleted,
+  },
+  statCardTotal: {
+    minWidth: '100%',
+    backgroundColor: colors.highlightBlue,
+    borderColor: colors.primary,
+    borderWidth: 2,
+  },
+  statHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    marginBottom: 8,
   },
-  infoTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
+  statNumber: {
+    fontSize: 32,
+    fontWeight: '800',
     color: colors.text,
   },
-  infoContent: {
-    marginTop: 12,
+  statValue: {
+    fontSize: 24,
+    fontWeight: '800',
+    color: colors.primary,
   },
-  infoText: {
+  statLabel: {
     fontSize: 14,
+    fontWeight: '600',
     color: colors.textSecondary,
-    lineHeight: 20,
+  },
+  recentJobsSection: {
+    paddingHorizontal: 20,
+    marginTop: 32,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  sectionLink: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: colors.primary,
+  },
+  jobCardPreview: {
+    backgroundColor: colors.card,
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: colors.border,
+    boxShadow: '0px 2px 6px rgba(0, 0, 0, 0.06)',
+    elevation: 2,
+  },
+  jobCardPreviewHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     marginBottom: 12,
   },
-  featureList: {
-    gap: 8,
-  },
-  featureItem: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 8,
-  },
-  featureBullet: {
+  jobCardNumber: {
     fontSize: 16,
+    fontWeight: '700',
+    color: colors.text,
+  },
+  jobCardStatus: {
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  jobCardStatusText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: colors.textInverse,
+  },
+  jobCardCustomer: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: colors.text,
+    marginBottom: 4,
+  },
+  jobCardVehicle: {
+    fontSize: 14,
+    color: colors.textSecondary,
+    marginBottom: 12,
+  },
+  jobCardFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: colors.divider,
+  },
+  jobCardDate: {
+    fontSize: 13,
+    color: colors.textSecondary,
+  },
+  jobCardTotal: {
+    fontSize: 16,
+    fontWeight: '700',
     color: colors.primary,
-    fontWeight: 'bold',
-    marginTop: 2,
-  },
-  featureText: {
-    flex: 1,
-    fontSize: 14,
-    color: colors.textSecondary,
-    lineHeight: 20,
-  },
-  warningCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#FFF3E0',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 24,
-    borderWidth: 1,
-    borderColor: '#FFB74D',
-    gap: 12,
-  },
-  warningContent: {
-    flex: 1,
-  },
-  warningTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: colors.text,
-    marginBottom: 4,
-  },
-  warningText: {
-    fontSize: 14,
-    color: colors.textSecondary,
-    lineHeight: 20,
-  },
-  successCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#E8F5E9',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 24,
-    borderWidth: 1,
-    borderColor: '#81C784',
-    gap: 12,
-  },
-  successContent: {
-    flex: 1,
-  },
-  successTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: colors.text,
-    marginBottom: 4,
-  },
-  successText: {
-    fontSize: 14,
-    color: colors.textSecondary,
-    lineHeight: 20,
   },
 });

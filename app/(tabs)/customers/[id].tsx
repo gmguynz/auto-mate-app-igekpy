@@ -21,10 +21,12 @@ import { Customer, Vehicle } from '@/types/customer';
 import { storageUtils } from '@/utils/storage';
 import { dateUtils } from '@/utils/dateUtils';
 import { notificationService } from '@/utils/notificationService';
+import { useAuth } from '@/contexts/AuthContext';
 
 export default function CustomerDetailScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams();
+  const { isAdmin } = useAuth();
   const [customer, setCustomer] = useState<Customer | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [editedCustomer, setEditedCustomer] = useState<Customer | null>(null);
@@ -57,6 +59,14 @@ export default function CustomerDetailScreen() {
   const loadAllCustomers = async () => {
     const customers = await storageUtils.getCustomers();
     setAllCustomers(customers);
+  };
+
+  const handleEdit = () => {
+    if (!isAdmin) {
+      Alert.alert('Permission Denied', 'Only administrators can edit customer information.');
+      return;
+    }
+    setIsEditing(true);
   };
 
   const handleSave = async () => {
@@ -149,25 +159,21 @@ export default function CustomerDetailScreen() {
     try {
       const vehicleToTransfer = customer.vehicles[transferVehicleIndex];
       
-      // Remove vehicle from current owner
       const updatedCurrentOwner = {
         ...customer,
         vehicles: customer.vehicles.filter((_, i) => i !== transferVehicleIndex),
         updatedAt: new Date().toISOString(),
       };
 
-      // Add vehicle to new owner
       const updatedNewOwner = {
         ...selectedNewOwner,
         vehicles: [...selectedNewOwner.vehicles, vehicleToTransfer],
         updatedAt: new Date().toISOString(),
       };
 
-      // Update both customers
       await storageUtils.updateCustomer(updatedCurrentOwner);
       await storageUtils.updateCustomer(updatedNewOwner);
 
-      // Reschedule notifications
       console.log('Rescheduling notifications after vehicle transfer...');
       await notificationService.scheduleAllReminders();
 
@@ -180,7 +186,6 @@ export default function CustomerDetailScreen() {
       setTransferVehicleIndex(-1);
       setSelectedNewOwner(null);
       
-      // Reload customer data
       await loadCustomer();
       await loadAllCustomers();
     } catch (error) {
@@ -320,6 +325,7 @@ export default function CustomerDetailScreen() {
 
   const filteredVehicles = getFilteredVehicles();
   const displayVehicles = isEditing ? editedCustomer.vehicles : filteredVehicles;
+  const displayName = getCustomerDisplayName(customer);
 
   return (
     <View style={styles.container}>
@@ -332,9 +338,9 @@ export default function CustomerDetailScreen() {
             color={colors.text}
           />
         </TouchableOpacity>
-        <Text style={styles.title}>{getCustomerDisplayName(customer)}</Text>
-        {!isEditing ? (
-          <TouchableOpacity onPress={() => setIsEditing(true)} style={styles.editButton} activeOpacity={0.7}>
+        <Text style={styles.title}>{displayName}</Text>
+        {!isEditing && isAdmin ? (
+          <TouchableOpacity onPress={handleEdit} style={styles.editButton} activeOpacity={0.7}>
             <IconSymbol
               ios_icon_name="pencil"
               android_material_icon_name="edit"
@@ -347,11 +353,23 @@ export default function CustomerDetailScreen() {
         )}
       </View>
 
+      {!isEditing && !isAdmin && (
+        <View style={styles.readOnlyBanner}>
+          <IconSymbol
+            ios_icon_name="lock.fill"
+            android_material_icon_name="lock"
+            size={16}
+            color={colors.textSecondary}
+          />
+          <Text style={styles.readOnlyText}>Customer information is read-only. Contact an admin to make changes.</Text>
+        </View>
+      )}
+
       {!isEditing && (
         <View style={styles.actionBar}>
           <TouchableOpacity
             style={styles.viewJobsActionButton}
-            onPress={() => router.push(`/customers/customer-jobs?customerId=${customer.id}&customerName=${encodeURIComponent(getCustomerDisplayName(customer))}`)}
+            onPress={() => router.push(`/customers/customer-jobs?customerId=${customer.id}&customerName=${encodeURIComponent(displayName)}`)}
             activeOpacity={0.7}
           >
             <IconSymbol
@@ -523,7 +541,7 @@ export default function CustomerDetailScreen() {
                           ios_icon_name="arrow.right.circle"
                           android_material_icon_name="swap-horiz"
                           size={20}
-                          color={colors.primary}
+                          color={colors.textInverse}
                         />
                         <Text style={styles.transferButtonText}>Transfer</Text>
                       </TouchableOpacity>
@@ -728,7 +746,6 @@ export default function CustomerDetailScreen() {
 
       {renderDatePicker()}
 
-      {/* Transfer Vehicle Modal */}
       <Modal
         visible={showTransferModal}
         animationType="slide"
@@ -887,8 +904,24 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 20,
-    fontWeight: 'bold',
+    fontWeight: '700',
     color: colors.text,
+  },
+  readOnlyBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: colors.highlightBlue,
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  readOnlyText: {
+    flex: 1,
+    fontSize: 13,
+    color: colors.textSecondary,
+    fontWeight: '500',
   },
   actionBar: {
     paddingHorizontal: 20,
@@ -904,15 +937,13 @@ const styles = StyleSheet.create({
     gap: 8,
     paddingVertical: 12,
     paddingHorizontal: 16,
-    backgroundColor: colors.highlight,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: colors.primary,
+    backgroundColor: colors.primary,
+    borderRadius: 12,
   },
   viewJobsActionButtonText: {
     fontSize: 16,
-    fontWeight: '600',
-    color: colors.primary,
+    fontWeight: '700',
+    color: colors.textInverse,
   },
   searchContainer: {
     flexDirection: 'row',
@@ -964,29 +995,34 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   sectionTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
+    fontSize: 20,
+    fontWeight: '700',
     color: colors.text,
     marginBottom: 16,
   },
   infoCard: {
     backgroundColor: colors.card,
-    borderRadius: 12,
-    padding: 16,
+    borderRadius: 16,
+    padding: 20,
     borderWidth: 1,
     borderColor: colors.border,
+    boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.06)',
+    elevation: 3,
   },
   label: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '600',
     color: colors.textSecondary,
     marginBottom: 6,
     marginTop: 12,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
   value: {
     fontSize: 16,
     color: colors.text,
     marginBottom: 4,
+    fontWeight: '500',
   },
   input: {
     backgroundColor: colors.background,
@@ -1007,11 +1043,13 @@ const styles = StyleSheet.create({
   },
   vehicleCard: {
     backgroundColor: colors.card,
-    borderRadius: 12,
-    padding: 16,
+    borderRadius: 16,
+    padding: 20,
     marginBottom: 16,
     borderWidth: 1,
     borderColor: colors.border,
+    boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.06)',
+    elevation: 3,
   },
   vehicleHeader: {
     flexDirection: 'row',
@@ -1020,11 +1058,11 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     paddingBottom: 12,
     borderBottomWidth: 1,
-    borderBottomColor: colors.border,
+    borderBottomColor: colors.divider,
   },
   vehicleTitle: {
     fontSize: 16,
-    fontWeight: 'bold',
+    fontWeight: '700',
     color: colors.text,
   },
   vehicleActions: {
@@ -1046,7 +1084,7 @@ const styles = StyleSheet.create({
   transferButtonText: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#FFFFFF',
+    color: colors.textInverse,
     userSelect: Platform.OS === 'web' ? 'none' : undefined,
   },
   dateButton: {
@@ -1071,10 +1109,10 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   statusBadge: {
-    backgroundColor: '#ffebee',
+    backgroundColor: colors.highlightRed,
     paddingHorizontal: 8,
     paddingVertical: 4,
-    borderRadius: 4,
+    borderRadius: 6,
     alignSelf: 'flex-start',
     marginTop: 4,
   },
@@ -1086,17 +1124,17 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   dueSoonText: {
-    color: colors.accent,
+    color: colors.warning,
     fontWeight: '600',
   },
   overdueLabel: {
     fontSize: 12,
-    fontWeight: 'bold',
+    fontWeight: '700',
     color: colors.error,
   },
   dueSoonLabel: {
     fontSize: 12,
-    fontWeight: 'bold',
+    fontWeight: '700',
     color: colors.text,
   },
   vehicleViewJobsButton: {
@@ -1107,7 +1145,7 @@ const styles = StyleSheet.create({
     marginTop: 12,
     paddingVertical: 10,
     paddingHorizontal: 12,
-    backgroundColor: colors.highlight,
+    backgroundColor: colors.highlightBlue,
     borderRadius: 8,
     borderWidth: 1,
     borderColor: colors.primary,
@@ -1119,20 +1157,20 @@ const styles = StyleSheet.create({
   },
   buttonContainer: {
     marginTop: 16,
+    gap: 12,
   },
   saveButton: {
     backgroundColor: colors.primary,
     borderRadius: 12,
     paddingVertical: 16,
     alignItems: 'center',
-    marginBottom: 12,
     cursor: Platform.OS === 'web' ? 'pointer' : undefined,
     userSelect: Platform.OS === 'web' ? 'none' : undefined,
   },
   saveButtonText: {
     fontSize: 16,
-    fontWeight: 'bold',
-    color: colors.card,
+    fontWeight: '700',
+    color: colors.textInverse,
     userSelect: Platform.OS === 'web' ? 'none' : undefined,
   },
   cancelButton: {
@@ -1154,7 +1192,7 @@ const styles = StyleSheet.create({
   modalOverlay: {
     flex: 1,
     justifyContent: 'flex-end',
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    backgroundColor: colors.overlay,
   },
   modalContent: {
     backgroundColor: colors.card,
@@ -1226,7 +1264,7 @@ const styles = StyleSheet.create({
     lineHeight: 20,
   },
   transferInfoBold: {
-    fontWeight: 'bold',
+    fontWeight: '700',
     color: colors.primary,
   },
   customerList: {
@@ -1252,7 +1290,7 @@ const styles = StyleSheet.create({
   customerItemSelected: {
     borderColor: colors.primary,
     borderWidth: 2,
-    backgroundColor: colors.highlight,
+    backgroundColor: colors.highlightBlue,
   },
   customerItemInfo: {
     flex: 1,
@@ -1287,14 +1325,14 @@ const styles = StyleSheet.create({
     cursor: Platform.OS === 'web' ? 'not-allowed' : undefined,
   },
   transferConfirmButtonText: {
-    color: '#FFFFFF',
+    color: colors.textInverse,
     fontSize: 16,
     fontWeight: '600',
     userSelect: Platform.OS === 'web' ? 'none' : undefined,
   },
   modalTitle: {
     fontSize: 20,
-    fontWeight: 'bold',
+    fontWeight: '700',
     color: colors.text,
   },
 });

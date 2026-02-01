@@ -11,24 +11,34 @@ export default function TabLayout() {
     <Tabs
       screenOptions={{
         tabBarActiveTintColor: colors.primary,
-        tabBarInactiveTintColor: colors.text,
+        tabBarInactiveTintColor: colors.textSecondary,
         headerShown: false,
         tabBarStyle: {
           backgroundColor: colors.card,
           borderTopColor: colors.border,
+          borderTopWidth: 1,
+          height: 60,
+          paddingBottom: 8,
+          paddingTop: 8,
+          boxShadow: '0px -2px 8px rgba(0, 0, 0, 0.08)',
+          elevation: 8,
+        },
+        tabBarLabelStyle: {
+          fontSize: 12,
+          fontWeight: '600',
         },
       }}
     >
       <Tabs.Screen
         name="(home)"
         options={{
-          title: 'Home',
+          title: 'Dashboard',
           tabBarIcon: ({ color }) => (
             <IconSymbol
               ios_icon_name="house.fill"
-              android_material_icon_name="home"
+              android_material_icon_name="dashboard"
               color={color}
-              size={28}
+              size={24}
             />
           ),
         }}
@@ -36,13 +46,13 @@ export default function TabLayout() {
       <Tabs.Screen
         name="customers"
         options={{
-          title: 'Customers',
+          title: 'Job Cards',
           tabBarIcon: ({ color }) => (
             <IconSymbol
-              ios_icon_name="person.3.fill"
-              android_material_icon_name="people"
+              ios_icon_name="doc.text.fill"
+              android_material_icon_name="assignment"
               color={color}
-              size={28}
+              size={24}
             />
           ),
         }}
@@ -57,7 +67,7 @@ export default function TabLayout() {
                 ios_icon_name="shield.fill"
                 android_material_icon_name="admin-panel-settings"
                 color={color}
-                size={28}
+                size={24}
               />
             ),
           }}
@@ -72,7 +82,7 @@ export default function TabLayout() {
               ios_icon_name="person.circle.fill"
               android_material_icon_name="account-circle"
               color={color}
-              size={28}
+              size={24}
             />
           ),
         }}
