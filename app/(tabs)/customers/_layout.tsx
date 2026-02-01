@@ -7,12 +7,19 @@ export default function CustomersLayout() {
     <Stack
       screenOptions={{
         headerShown: false,
-        animation: 'slide_from_right',
       }}
     >
       <Stack.Screen name="index" />
       <Stack.Screen name="add" />
       <Stack.Screen name="[id]" />
+      <Stack.Screen name="add-job-card" />
+      <Stack.Screen name="job-card-detail" />
+      <Stack.Screen name="job-cards" />
+      <Stack.Screen name="parts" />
+      <Stack.Screen name="reminders" />
+      <Stack.Screen name="vehicles" />
+      <Stack.Screen name="customer-jobs" />
+      <Stack.Screen name="vehicle-jobs" />
     </Stack>
   );
 }

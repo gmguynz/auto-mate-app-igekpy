@@ -72,7 +72,7 @@ export default function PartsScreen() {
   };
 
   const handleBack = () => {
-    console.log('User tapped back button - navigating back');
+    console.log('User tapped back button on Parts screen');
     router.back();
   };
 
@@ -485,7 +485,7 @@ export default function PartsScreen() {
           <View style={styles.deleteModal}>
             <Text style={styles.deleteModalTitle}>Delete Part?</Text>
             <Text style={styles.deleteModalText}>
-              Are you sure you want to delete "{selectedPart?.name}"? This action cannot be undone.
+              Are you sure you want to delete &quot;{selectedPart?.name}&quot;? This action cannot be undone.
             </Text>
             <View style={styles.deleteModalButtons}>
               <TouchableOpacity

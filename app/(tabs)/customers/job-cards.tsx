@@ -60,7 +60,7 @@ export default function JobCardsScreen() {
   };
 
   const handleBack = () => {
-    console.log('User tapped back button - navigating back');
+    console.log('User tapped back button on Job Cards screen');
     router.back();
   };
 
@@ -157,7 +157,10 @@ export default function JobCardsScreen() {
         </TouchableOpacity>
         <Text style={styles.title}>Job Cards</Text>
         <TouchableOpacity
-          onPress={() => router.push('/customers/add-job-card')}
+          onPress={() => {
+            console.log('User tapped Add Job Card button');
+            router.push('/(tabs)/customers/add-job-card');
+          }}
           style={styles.addButton}
           activeOpacity={0.7}
         >
@@ -300,7 +303,10 @@ export default function JobCardsScreen() {
               <React.Fragment key={index}>
                 <TouchableOpacity
                   style={styles.jobCardItem}
-                  onPress={() => router.push(`/customers/job-card-detail?id=${jobCard.id}`)}
+                  onPress={() => {
+                    console.log('User tapped job card:', jobCard.jobNumber);
+                    router.push(`/(tabs)/customers/job-card-detail?id=${jobCard.id}`);
+                  }}
                   activeOpacity={0.7}
                 >
                   <View style={styles.jobCardHeader}>

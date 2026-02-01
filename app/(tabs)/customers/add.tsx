@@ -169,12 +169,20 @@ export default function AddCustomerScreen() {
       await notificationService.scheduleAllReminders();
       
       Alert.alert('Success', 'Customer added successfully', [
-        { text: 'OK', onPress: () => router.back() },
+        { text: 'OK', onPress: () => {
+          console.log('Customer added, navigating back');
+          router.back();
+        }},
       ]);
     } catch (error) {
       console.error('Error saving customer:', error);
       Alert.alert('Error', 'Failed to save customer');
     }
+  };
+
+  const handleBack = () => {
+    console.log('User tapped back button on Add Customer screen');
+    router.back();
   };
 
   const renderDatePicker = () => {
@@ -274,7 +282,7 @@ export default function AddCustomerScreen() {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+        <TouchableOpacity onPress={handleBack} style={styles.backButton}>
           <IconSymbol
             ios_icon_name="chevron.left"
             android_material_icon_name="arrow-back"
