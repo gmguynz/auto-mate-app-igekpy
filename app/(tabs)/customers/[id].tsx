@@ -46,12 +46,14 @@ export default function CustomerDetailScreen() {
   const [customerSearchQuery, setCustomerSearchQuery] = useState('');
 
   useEffect(() => {
+    console.log('Customer Detail screen mounted with ID:', id);
     loadCustomer();
     loadAllCustomers();
   }, [id]);
 
   const loadCustomer = async () => {
     if (typeof id === 'string') {
+      console.log('Loading customer with ID:', id);
       const data = await storageUtils.getCustomerById(id);
       setCustomer(data);
       setEditedCustomer(data);
@@ -68,10 +70,12 @@ export default function CustomerDetailScreen() {
       Alert.alert('Permission Denied', 'Only administrators can edit customer information.');
       return;
     }
+    console.log('User tapped Edit button');
     setIsEditing(true);
   };
 
   const handleSave = async () => {
+    console.log('User tapped Save button');
     if (!editedCustomer) return;
 
     if (!editedCustomer.firstName.trim() && !editedCustomer.companyName.trim()) {
@@ -103,8 +107,15 @@ export default function CustomerDetailScreen() {
   };
 
   const handleCancel = () => {
+    console.log('User tapped Cancel button');
     setEditedCustomer(customer);
     setIsEditing(false);
+  };
+
+  const handleBack = () => {
+    console.log('User tapped back button on Customer Detail screen');
+    console.log('Current route:', router);
+    router.back();
   };
 
   const updateField = (field: keyof Customer, value: any) => {
@@ -122,6 +133,7 @@ export default function CustomerDetailScreen() {
   };
 
   const addVehicle = () => {
+    console.log('User tapped Add Vehicle button');
     if (editedCustomer) {
       const newVehicle: Vehicle = {
         id: Date.now().toString(),
@@ -140,6 +152,7 @@ export default function CustomerDetailScreen() {
   };
 
   const removeVehicle = (index: number) => {
+    console.log('User tapped Remove Vehicle button for index:', index);
     if (editedCustomer) {
       const updated = editedCustomer.vehicles.filter((_, i) => i !== index);
       setEditedCustomer({ ...editedCustomer, vehicles: updated });
@@ -157,6 +170,7 @@ export default function CustomerDetailScreen() {
   const confirmTransferVehicle = async () => {
     if (!customer || !selectedNewOwner || transferVehicleIndex < 0) return;
 
+    console.log('User confirmed vehicle transfer');
     setTransferring(true);
     try {
       const vehicleToTransfer = customer.vehicles[transferVehicleIndex];
@@ -365,7 +379,7 @@ export default function CustomerDetailScreen() {
     return (
       <View style={styles.container}>
         <View style={styles.header}>
-          <TouchableOpacity onPress={() => router.back()} style={styles.backButton} activeOpacity={0.7}>
+          <TouchableOpacity onPress={handleBack} style={styles.backButton} activeOpacity={0.7}>
             <IconSymbol
               ios_icon_name="chevron.left"
               android_material_icon_name="arrow-back"
@@ -391,7 +405,7 @@ export default function CustomerDetailScreen() {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backButton} activeOpacity={0.7}>
+        <TouchableOpacity onPress={handleBack} style={styles.backButton} activeOpacity={0.7}>
           <IconSymbol
             ios_icon_name="chevron.left"
             android_material_icon_name="arrow-back"
@@ -430,7 +444,10 @@ export default function CustomerDetailScreen() {
         <View style={styles.actionBar}>
           <TouchableOpacity
             style={styles.viewJobsActionButton}
-            onPress={() => router.push(`/customers/customer-jobs?customerId=${customer.id}&customerName=${encodeURIComponent(displayName)}`)}
+            onPress={() => {
+              console.log('User tapped View All Jobs button');
+              router.push(`/customers/customer-jobs?customerId=${customer.id}&customerName=${encodeURIComponent(displayName)}`);
+            }}
             activeOpacity={0.7}
           >
             <IconSymbol
@@ -788,7 +805,10 @@ export default function CustomerDetailScreen() {
                 {!isEditing && (
                   <TouchableOpacity
                     style={styles.vehicleViewJobsButton}
-                    onPress={() => router.push(`/customers/vehicle-jobs?vehicleId=${vehicle.id}&vehicleReg=${vehicle.registrationNumber}`)}
+                    onPress={() => {
+                      console.log('User tapped View Jobs for Vehicle button');
+                      router.push(`/customers/vehicle-jobs?vehicleId=${vehicle.id}&vehicleReg=${vehicle.registrationNumber}`);
+                    }}
                     activeOpacity={0.7}
                   >
                     <IconSymbol
