@@ -60,8 +60,8 @@ export default function JobCardsScreen() {
   };
 
   const handleBack = () => {
-    console.log('User tapped back button on Job Cards screen - navigating to customers list');
-    router.push('/(tabs)/customers');
+    console.log('User tapped back button on Job Cards screen - navigating back');
+    router.back();
   };
 
   const getFilteredJobCards = () => {
