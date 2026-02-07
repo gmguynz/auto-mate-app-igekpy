@@ -1,40 +1,28 @@
 
 import React from 'react';
-import { NativeTabs, Icon, Label } from 'expo-router/unstable-native-tabs';
+import { Platform } from 'react-native';
 import { colors } from '@/styles/commonStyles';
-import { useAuth } from '@/contexts/AuthContext';
+import { IconSymbol } from '@/components/IconSymbol.ios';
+import { NativeTabs, Icon, Label } from 'expo-router/unstable-native-tabs';
 
 export default function TabLayout() {
-  const { isAdmin } = useAuth();
-
   return (
-    <NativeTabs
-      tintColor={colors.primary}
-      iconColor={colors.textSecondary}
-      labelStyle={{
-        color: colors.text,
-      }}
-    >
+    <NativeTabs>
       <NativeTabs.Trigger name="(home)">
-        <Icon sf="house.fill" />
-        <Label>Home</Label>
+        <Label>Dashboard</Label>
+        <Icon sf={{ default: 'house', selected: 'house.fill' }} drawable="home" />
       </NativeTabs.Trigger>
-      
       <NativeTabs.Trigger name="customers">
-        <Icon sf="person.2.fill" />
         <Label>Customers</Label>
+        <Icon sf={{ default: 'person.2', selected: 'person.2.fill' }} drawable="people" />
       </NativeTabs.Trigger>
-      
-      {isAdmin && (
-        <NativeTabs.Trigger name="admin">
-          <Icon sf="shield.fill" />
-          <Label>Admin</Label>
-        </NativeTabs.Trigger>
-      )}
-      
+      <NativeTabs.Trigger name="admin">
+        <Label>Admin</Label>
+        <Icon sf={{ default: 'gearshape', selected: 'gearshape.fill' }} drawable="settings" />
+      </NativeTabs.Trigger>
       <NativeTabs.Trigger name="profile">
-        <Icon sf="person.circle.fill" />
         <Label>Profile</Label>
+        <Icon sf={{ default: 'person.crop.circle', selected: 'person.crop.circle.fill' }} drawable="account-circle" />
       </NativeTabs.Trigger>
     </NativeTabs>
   );

@@ -38,6 +38,7 @@ export default function AddCustomerScreen() {
   const [webDateInput, setWebDateInput] = useState('');
 
   const addVehicle = () => {
+    console.log('User tapped Add Vehicle button');
     const newVehicle: Vehicle = {
       id: Date.now().toString(),
       registrationNumber: '',
@@ -51,6 +52,7 @@ export default function AddCustomerScreen() {
   };
 
   const removeVehicle = (index: number) => {
+    console.log('User tapped Remove Vehicle button for vehicle', index);
     const updated = vehicles.filter((_, i) => i !== index);
     setVehicles(updated);
   };
@@ -143,6 +145,7 @@ export default function AddCustomerScreen() {
   };
 
   const handleSave = async () => {
+    console.log('User tapped Save button on Add Customer screen');
     if (!validateForm()) {
       return;
     }
@@ -162,6 +165,7 @@ export default function AddCustomerScreen() {
     };
 
     try {
+      console.log('Saving customer:', newCustomer);
       await storageUtils.addCustomer(newCustomer);
       
       // Reschedule all notifications to include the new customer
@@ -170,19 +174,14 @@ export default function AddCustomerScreen() {
       
       Alert.alert('Success', 'Customer added successfully', [
         { text: 'OK', onPress: () => {
-          console.log('Customer added, navigating to customers list');
-          router.push('/(tabs)/customers');
+          console.log('Customer added successfully, navigating back');
+          router.back();
         }},
       ]);
     } catch (error) {
       console.error('Error saving customer:', error);
       Alert.alert('Error', 'Failed to save customer');
     }
-  };
-
-  const handleBack = () => {
-    console.log('User tapped back button on Add Customer screen - navigating to customers list');
-    router.push('/(tabs)/customers');
   };
 
   const renderDatePicker = () => {
@@ -281,21 +280,6 @@ export default function AddCustomerScreen() {
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
-        <TouchableOpacity onPress={handleBack} style={styles.backButton}>
-          <IconSymbol
-            ios_icon_name="chevron.left"
-            android_material_icon_name="arrow-back"
-            size={24}
-            color={colors.text}
-          />
-        </TouchableOpacity>
-        <Text style={styles.title}>Add Customer</Text>
-        <TouchableOpacity onPress={handleSave} style={styles.saveButton}>
-          <Text style={styles.saveButtonText}>Save</Text>
-        </TouchableOpacity>
-      </View>
-
       <ScrollView
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
@@ -377,7 +361,7 @@ export default function AddCustomerScreen() {
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Vehicles</Text>
-            <TouchableOpacity onPress={addVehicle} style={styles.addButton}>
+            <TouchableOpacity onPress={addVehicle} style={styles.addButton} activeOpacity={0.7}>
               <IconSymbol
                 ios_icon_name="plus.circle.fill"
                 android_material_icon_name="add-circle"
@@ -393,7 +377,7 @@ export default function AddCustomerScreen() {
               <View style={styles.vehicleCard}>
                 <View style={styles.vehicleHeader}>
                   <Text style={styles.vehicleTitle}>Vehicle {index + 1}</Text>
-                  <TouchableOpacity onPress={() => removeVehicle(index)}>
+                  <TouchableOpacity onPress={() => removeVehicle(index)} activeOpacity={0.7}>
                     <IconSymbol
                       ios_icon_name="trash"
                       android_material_icon_name="delete"
@@ -447,6 +431,7 @@ export default function AddCustomerScreen() {
                 <TouchableOpacity
                   style={styles.dateButton}
                   onPress={() => showDatePickerFor(index, 'inspectionDueDate')}
+                  activeOpacity={0.7}
                 >
                   <IconSymbol
                     ios_icon_name="calendar"
@@ -463,6 +448,7 @@ export default function AddCustomerScreen() {
                 <TouchableOpacity
                   style={styles.dateButton}
                   onPress={() => showDatePickerFor(index, 'serviceDueDate')}
+                  activeOpacity={0.7}
                 >
                   <IconSymbol
                     ios_icon_name="calendar"
@@ -493,6 +479,10 @@ export default function AddCustomerScreen() {
             </View>
           )}
         </View>
+
+        <TouchableOpacity onPress={handleSave} style={styles.saveButton} activeOpacity={0.8}>
+          <Text style={styles.saveButtonText}>Save Customer</Text>
+        </TouchableOpacity>
       </ScrollView>
 
       {renderDatePicker()}
@@ -504,36 +494,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingTop: 60,
-    paddingHorizontal: 20,
-    paddingBottom: 16,
-    backgroundColor: colors.card,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-  },
-  backButton: {
-    padding: 8,
-  },
-  title: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: colors.text,
-  },
-  saveButton: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    backgroundColor: colors.primary,
-    borderRadius: 8,
-  },
-  saveButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
   },
   scrollView: {
     flex: 1,
@@ -635,6 +595,19 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: colors.textSecondary,
     marginTop: 4,
+  },
+  saveButton: {
+    backgroundColor: colors.primary,
+    borderRadius: 12,
+    padding: 16,
+    alignItems: 'center',
+    marginTop: 8,
+    marginBottom: 40,
+  },
+  saveButtonText: {
+    color: '#FFFFFF',
+    fontSize: 18,
+    fontWeight: 'bold',
   },
   modalOverlay: {
     flex: 1,

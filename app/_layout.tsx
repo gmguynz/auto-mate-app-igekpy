@@ -37,8 +37,10 @@ function RootLayoutNav() {
     const inAuthGroup = segments[0] === '(auth)';
 
     if (!user && !inAuthGroup) {
+      console.log('User not authenticated, redirecting to login');
       router.replace('/(auth)/login');
     } else if (user && inAuthGroup) {
+      console.log('User authenticated, redirecting to dashboard');
       router.replace('/(tabs)/(home)');
     }
 

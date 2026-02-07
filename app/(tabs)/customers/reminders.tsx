@@ -11,7 +11,6 @@ import {
   RefreshControl,
   ActivityIndicator,
   Platform,
-  Pressable,
   Modal,
 } from 'react-native';
 import { useRouter } from 'expo-router';
@@ -23,7 +22,6 @@ import { dateUtils } from '@/utils/dateUtils';
 import { notificationService } from '@/utils/notificationService';
 import { emailService } from '@/utils/emailService';
 import { isSupabaseConfigured } from '@/integrations/supabase/client';
-import { AppFooter } from '@/components/AppFooter';
 
 interface Reminder {
   customerId: string;
@@ -195,10 +193,10 @@ export default function RemindersScreen() {
       console.log('Email sent successfully');
       setShowEmailModal(false);
       setSelectedReminder(null);
-      alert('Email sent successfully!');
+      Alert.alert('Success', 'Email sent successfully!');
     } catch (error: any) {
       console.error('Error sending email:', error);
-      alert(error.message || 'Failed to send email');
+      Alert.alert('Error', error.message || 'Failed to send email');
     } finally {
       setSendingEmail(false);
     }
@@ -206,7 +204,7 @@ export default function RemindersScreen() {
 
   const showEmailTroubleshooting = () => {
     const message = `Email functionality requires Supabase configuration.\n\nTo enable email reminders:\n1. Set up Supabase project\n2. Configure email service\n3. Add SMTP settings\n\nFor now, you can:\n- Call customers directly\n- Send SMS reminders\n- Use your email client`;
-    alert(message);
+    Alert.alert('Email Setup Required', message);
   };
 
   const handleSendReminder = (reminder: Reminder) => {
@@ -243,18 +241,6 @@ export default function RemindersScreen() {
   if (loading) {
     return (
       <View style={styles.container}>
-        <View style={styles.header}>
-          <TouchableOpacity onPress={() => router.back()} style={styles.backButton} activeOpacity={0.7}>
-            <IconSymbol
-              ios_icon_name="chevron.left"
-              android_material_icon_name="arrow-back"
-              size={24}
-              color={colors.text}
-            />
-          </TouchableOpacity>
-          <Text style={styles.title}>Reminders</Text>
-          <View style={{ width: 40 }} />
-        </View>
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={colors.primary} />
           <Text style={styles.loadingText}>Loading reminders...</Text>
@@ -265,19 +251,6 @@ export default function RemindersScreen() {
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backButton} activeOpacity={0.7}>
-          <IconSymbol
-            ios_icon_name="chevron.left"
-            android_material_icon_name="arrow-back"
-            size={24}
-            color={colors.text}
-          />
-        </TouchableOpacity>
-        <Text style={styles.title}>Reminders</Text>
-        <View style={{ width: 40 }} />
-      </View>
-
       <View style={styles.statsContainer}>
         <View style={styles.statCard}>
           <Text style={styles.statValue}>{notificationStats.total}</Text>
@@ -447,8 +420,6 @@ export default function RemindersScreen() {
           </View>
         </View>
       </Modal>
-
-      <AppFooter />
     </View>
   );
 }
@@ -457,25 +428,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingTop: 60,
-    paddingHorizontal: 20,
-    paddingBottom: 16,
-    backgroundColor: colors.card,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-  },
-  backButton: {
-    padding: 8,
-  },
-  title: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: colors.text,
   },
   statsContainer: {
     flexDirection: 'row',

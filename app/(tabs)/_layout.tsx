@@ -1,50 +1,31 @@
 
+import React from 'react';
 import { Tabs } from 'expo-router';
-import { IconSymbol } from '@/components/IconSymbol';
-import { colors } from '@/styles/commonStyles';
-import { useAuth } from '@/contexts/AuthContext';
 import { Platform } from 'react-native';
+import { colors } from '@/styles/commonStyles';
+import { IconSymbol } from '@/components/IconSymbol';
+import { FloatingTabBar } from '@/components/FloatingTabBar';
 
 export default function TabLayout() {
-  const { isAdmin } = useAuth();
-
   return (
     <Tabs
+      tabBar={(props) => <FloatingTabBar {...props} />}
       screenOptions={{
+        headerShown: false,
         tabBarActiveTintColor: colors.primary,
         tabBarInactiveTintColor: colors.textSecondary,
-        headerShown: false,
-        tabBarStyle: {
-          backgroundColor: colors.card,
-          borderTopColor: colors.border,
-          borderTopWidth: 1,
-          height: Platform.OS === 'web' ? 70 : 80,
-          paddingBottom: Platform.OS === 'ios' ? 20 : 12,
-          paddingTop: 8,
-          boxShadow: '0px -2px 8px rgba(0, 0, 0, 0.08)',
-          elevation: 8,
-        },
-        tabBarLabelStyle: {
-          fontSize: 12,
-          fontWeight: '600',
-          marginTop: 4,
-          marginBottom: Platform.OS === 'ios' ? 0 : 4,
-        },
-        tabBarIconStyle: {
-          marginTop: 4,
-        },
       }}
     >
       <Tabs.Screen
         name="(home)"
         options={{
           title: 'Dashboard',
-          tabBarIcon: ({ color }) => (
+          tabBarIcon: ({ color, focused }) => (
             <IconSymbol
-              ios_icon_name="house.fill"
-              android_material_icon_name="dashboard"
+              ios_icon_name={focused ? 'house.fill' : 'house'}
+              android_material_icon_name="home"
+              size={28}
               color={color}
-              size={24}
             />
           ),
         }}
@@ -52,43 +33,41 @@ export default function TabLayout() {
       <Tabs.Screen
         name="customers"
         options={{
-          title: 'Job Cards',
-          tabBarIcon: ({ color }) => (
+          title: 'Customers',
+          tabBarIcon: ({ color, focused }) => (
             <IconSymbol
-              ios_icon_name="doc.text.fill"
-              android_material_icon_name="assignment"
+              ios_icon_name={focused ? 'person.2.fill' : 'person.2'}
+              android_material_icon_name="people"
+              size={28}
               color={color}
-              size={24}
             />
           ),
         }}
       />
-      {isAdmin && (
-        <Tabs.Screen
-          name="admin"
-          options={{
-            title: 'Admin',
-            tabBarIcon: ({ color }) => (
-              <IconSymbol
-                ios_icon_name="shield.fill"
-                android_material_icon_name="admin-panel-settings"
-                color={color}
-                size={24}
-              />
-            ),
-          }}
-        />
-      )}
+      <Tabs.Screen
+        name="admin"
+        options={{
+          title: 'Admin',
+          tabBarIcon: ({ color, focused }) => (
+            <IconSymbol
+              ios_icon_name={focused ? 'gearshape.fill' : 'gearshape'}
+              android_material_icon_name="settings"
+              size={28}
+              color={color}
+            />
+          ),
+        }}
+      />
       <Tabs.Screen
         name="profile"
         options={{
           title: 'Profile',
-          tabBarIcon: ({ color }) => (
+          tabBarIcon: ({ color, focused }) => (
             <IconSymbol
-              ios_icon_name="person.circle.fill"
+              ios_icon_name={focused ? 'person.crop.circle.fill' : 'person.crop.circle'}
               android_material_icon_name="account-circle"
+              size={28}
               color={color}
-              size={24}
             />
           ),
         }}
