@@ -139,8 +139,8 @@ export default function AddJobCardScreen() {
   };
 
   const handleBack = () => {
-    console.log('User tapped back button - navigating back');
-    router.back();
+    console.log('User tapped back button - navigating to job cards list');
+    router.push('/(tabs)/customers/job-cards');
   };
 
   const handleSave = async () => {
@@ -195,7 +195,7 @@ export default function AddJobCardScreen() {
         console.log('Job card created successfully');
       }
 
-      router.back();
+      router.push('/(tabs)/customers/job-cards');
     } catch (error: any) {
       console.error('Error saving job card:', error);
       showErrorModal(error.message || 'Failed to save job card');

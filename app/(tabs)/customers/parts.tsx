@@ -72,8 +72,8 @@ export default function PartsScreen() {
   };
 
   const handleBack = () => {
-    console.log('User tapped back button on Parts screen');
-    router.back();
+    console.log('User tapped back button on Parts screen - navigating to customers list');
+    router.push('/(tabs)/customers');
   };
 
   const openAddModal = () => {

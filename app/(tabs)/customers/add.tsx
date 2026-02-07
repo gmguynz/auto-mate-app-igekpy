@@ -170,8 +170,8 @@ export default function AddCustomerScreen() {
       
       Alert.alert('Success', 'Customer added successfully', [
         { text: 'OK', onPress: () => {
-          console.log('Customer added, navigating back');
-          router.back();
+          console.log('Customer added, navigating to customers list');
+          router.push('/(tabs)/customers');
         }},
       ]);
     } catch (error) {
@@ -181,8 +181,8 @@ export default function AddCustomerScreen() {
   };
 
   const handleBack = () => {
-    console.log('User tapped back button on Add Customer screen');
-    router.back();
+    console.log('User tapped back button on Add Customer screen - navigating to customers list');
+    router.push('/(tabs)/customers');
   };
 
   const renderDatePicker = () => {
