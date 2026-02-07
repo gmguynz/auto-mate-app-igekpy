@@ -7,6 +7,7 @@ export default function CustomersLayout() {
     <Stack
       screenOptions={{
         headerShown: false,
+        animation: 'default',
       }}
     >
       <Stack.Screen name="index" />
