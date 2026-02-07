@@ -59,11 +59,6 @@ export default function JobCardsScreen() {
     loadJobCards(false);
   };
 
-  const handleBack = () => {
-    console.log('User tapped back button on Job Cards screen - navigating back');
-    router.back();
-  };
-
   const getFilteredJobCards = () => {
     let filtered = jobCards;
 
@@ -119,18 +114,6 @@ export default function JobCardsScreen() {
   if (loading) {
     return (
       <View style={styles.container}>
-        <View style={styles.header}>
-          <TouchableOpacity onPress={handleBack} style={styles.backButton} activeOpacity={0.7}>
-            <IconSymbol
-              ios_icon_name="chevron.left"
-              android_material_icon_name="arrow-back"
-              size={24}
-              color={colors.text}
-            />
-          </TouchableOpacity>
-          <Text style={styles.title}>Job Cards</Text>
-          <View style={{ width: 40 }} />
-        </View>
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={colors.primary} />
           <Text style={styles.loadingText}>Loading job cards...</Text>
@@ -147,14 +130,6 @@ export default function JobCardsScreen() {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={handleBack} style={styles.backButton} activeOpacity={0.7}>
-          <IconSymbol
-            ios_icon_name="chevron.left"
-            android_material_icon_name="arrow-back"
-            size={24}
-            color={colors.text}
-          />
-        </TouchableOpacity>
         <Text style={styles.title}>Job Cards</Text>
         <TouchableOpacity
           onPress={() => {
@@ -386,24 +361,17 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingTop: 60,
     paddingHorizontal: 20,
-    paddingBottom: 16,
+    paddingVertical: 16,
     backgroundColor: colors.card,
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
   },
-  backButton: {
-    padding: 8,
-    cursor: Platform.OS === 'web' ? 'pointer' : undefined,
-    userSelect: Platform.OS === 'web' ? 'none' : undefined,
-  },
   title: {
-    fontSize: 28,
+    fontSize: 20,
     fontWeight: 'bold',
     color: colors.text,
     flex: 1,
-    textAlign: 'center',
   },
   addButton: {
     padding: 8,

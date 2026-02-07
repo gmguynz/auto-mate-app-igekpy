@@ -138,11 +138,6 @@ export default function AddJobCardScreen() {
     setLabourEntries(jobCard.labourEntries || []);
   };
 
-  const handleBack = () => {
-    console.log('User tapped back button - navigating to job cards list');
-    router.push('/(tabs)/customers/job-cards');
-  };
-
   const handleSave = async () => {
     console.log('User tapped Save Job Card button');
     
@@ -195,7 +190,7 @@ export default function AddJobCardScreen() {
         console.log('Job card created successfully');
       }
 
-      router.push('/(tabs)/customers/job-cards');
+      router.back();
     } catch (error: any) {
       console.error('Error saving job card:', error);
       showErrorModal(error.message || 'Failed to save job card');
@@ -389,19 +384,6 @@ export default function AddJobCardScreen() {
       style={styles.container} 
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
-      <View style={styles.header}>
-        <TouchableOpacity onPress={handleBack} style={styles.backButton} activeOpacity={0.7}>
-          <IconSymbol
-            ios_icon_name="chevron.left"
-            android_material_icon_name="arrow-back"
-            size={24}
-            color={colors.text}
-          />
-        </TouchableOpacity>
-        <Text style={styles.title}>{jobCardId ? 'Edit Job Card' : 'New Job Card'}</Text>
-        <View style={{ width: 40 }} />
-      </View>
-
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
         {/* Customer Selection */}
         <View style={styles.section}>
@@ -1017,25 +999,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingTop: 60,
-    paddingHorizontal: 20,
-    paddingBottom: 16,
-    backgroundColor: colors.card,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-  },
-  backButton: {
-    padding: 8,
-  },
-  title: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: colors.text,
   },
   loadingContainer: {
     flex: 1,

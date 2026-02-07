@@ -71,11 +71,6 @@ export default function PartsScreen() {
     loadParts(false);
   };
 
-  const handleBack = () => {
-    console.log('User tapped back button on Parts screen - navigating to customers list');
-    router.push('/(tabs)/customers');
-  };
-
   const openAddModal = () => {
     console.log('User tapped Add Part button');
     setSelectedPart(null);
@@ -194,18 +189,6 @@ export default function PartsScreen() {
   if (loading) {
     return (
       <View style={styles.container}>
-        <View style={styles.header}>
-          <TouchableOpacity onPress={handleBack} style={styles.backButton} activeOpacity={0.7}>
-            <IconSymbol
-              ios_icon_name="chevron.left"
-              android_material_icon_name="arrow-back"
-              size={24}
-              color={colors.text}
-            />
-          </TouchableOpacity>
-          <Text style={styles.title}>Parts Inventory</Text>
-          <View style={{ width: 40 }} />
-        </View>
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={colors.primary} />
           <Text style={styles.loadingText}>Loading parts...</Text>
@@ -221,14 +204,6 @@ export default function PartsScreen() {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={handleBack} style={styles.backButton} activeOpacity={0.7}>
-          <IconSymbol
-            ios_icon_name="chevron.left"
-            android_material_icon_name="arrow-back"
-            size={24}
-            color={colors.text}
-          />
-        </TouchableOpacity>
         <Text style={styles.title}>Parts Inventory</Text>
         <TouchableOpacity
           onPress={openAddModal}
@@ -525,20 +500,17 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingTop: 60,
     paddingHorizontal: 20,
-    paddingBottom: 16,
+    paddingVertical: 16,
     backgroundColor: colors.card,
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
-  },
-  backButton: {
-    padding: 8,
   },
   title: {
     fontSize: 20,
     fontWeight: 'bold',
     color: colors.text,
+    flex: 1,
   },
   addButton: {
     padding: 8,
