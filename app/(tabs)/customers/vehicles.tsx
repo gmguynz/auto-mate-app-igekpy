@@ -87,22 +87,10 @@ export default function VehiclesScreen() {
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-          <IconSymbol
-            ios_icon_name="chevron.left"
-            android_material_icon_name="arrow-back"
-            size={24}
-            color={colors.text}
-          />
-        </TouchableOpacity>
-        <View style={styles.headerCenter}>
-          <Text style={styles.title}>Vehicle Database</Text>
-          <Text style={styles.subtitle}>
-            {vehicles.length} vehicle{vehicles.length !== 1 ? 's' : ''}
-          </Text>
-        </View>
-        <View style={{ width: 40 }} />
+      <View style={styles.headerInfo}>
+        <Text style={styles.subtitle}>
+          {vehicles.length} vehicle{vehicles.length !== 1 ? 's' : ''}
+        </Text>
       </View>
 
       <View style={styles.searchContainer}>
@@ -266,33 +254,16 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.background,
   },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingTop: 60,
+  headerInfo: {
     paddingHorizontal: 20,
-    paddingBottom: 16,
+    paddingVertical: 12,
     backgroundColor: colors.card,
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
   },
-  backButton: {
-    padding: 8,
-  },
-  headerCenter: {
-    flex: 1,
-    alignItems: 'center',
-  },
-  title: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: colors.text,
-  },
   subtitle: {
     fontSize: 14,
     color: colors.textSecondary,
-    marginTop: 2,
   },
   searchContainer: {
     flexDirection: 'row',

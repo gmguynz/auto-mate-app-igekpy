@@ -90,20 +90,6 @@ export default function VehicleJobsScreen() {
   if (loading) {
     return (
       <View style={styles.container}>
-        <View style={styles.header}>
-          <TouchableOpacity onPress={() => router.back()} style={styles.backButton} activeOpacity={0.7}>
-            <IconSymbol
-              ios_icon_name="chevron.left"
-              android_material_icon_name="arrow-back"
-              size={24}
-              color={colors.text}
-            />
-          </TouchableOpacity>
-          <View style={styles.headerCenter}>
-            <Text style={styles.title}>Vehicle Jobs</Text>
-          </View>
-          <View style={{ width: 40 }} />
-        </View>
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={colors.primary} />
           <Text style={styles.loadingText}>Loading job cards...</Text>
@@ -119,20 +105,9 @@ export default function VehicleJobsScreen() {
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backButton} activeOpacity={0.7}>
-          <IconSymbol
-            ios_icon_name="chevron.left"
-            android_material_icon_name="arrow-back"
-            size={24}
-            color={colors.text}
-          />
-        </TouchableOpacity>
-        <View style={styles.headerCenter}>
-          <Text style={styles.title}>Jobs for {decodedVehicleReg}</Text>
-          <Text style={styles.subtitle}>{jobCards.length} job{jobCards.length !== 1 ? 's' : ''}</Text>
-        </View>
-        <View style={{ width: 40 }} />
+      <View style={styles.headerInfo}>
+        <Text style={styles.vehicleReg}>{decodedVehicleReg}</Text>
+        <Text style={styles.jobCount}>{jobCards.length} job{jobCards.length !== 1 ? 's' : ''}</Text>
       </View>
 
       <View style={styles.statsContainer}>
@@ -231,36 +206,22 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.background,
   },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingTop: 60,
+  headerInfo: {
     paddingHorizontal: 20,
-    paddingBottom: 16,
+    paddingVertical: 16,
     backgroundColor: colors.card,
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
   },
-  backButton: {
-    padding: 8,
-    cursor: Platform.OS === 'web' ? 'pointer' : undefined,
-    userSelect: Platform.OS === 'web' ? 'none' : undefined,
-  },
-  headerCenter: {
-    flex: 1,
-    alignItems: 'center',
-  },
-  title: {
-    fontSize: 18,
+  vehicleReg: {
+    fontSize: 20,
     fontWeight: 'bold',
     color: colors.text,
-    textAlign: 'center',
+    marginBottom: 4,
   },
-  subtitle: {
+  jobCount: {
     fontSize: 14,
     color: colors.textSecondary,
-    marginTop: 2,
   },
   statsContainer: {
     flexDirection: 'row',
